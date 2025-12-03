@@ -460,6 +460,9 @@ toggleOverlayBtn.addEventListener('click', async () => {
       await chrome.storage.local.set({ overlayEnabled: response.enabled });
       updateOverlayButton(response.enabled);
       showStatus(response.enabled ? 'Overlay enabled' : 'Overlay disabled', 'success');
+
+      // Close popup after toggling
+      window.close();
     }
   } catch (error) {
     console.error('Error toggling overlay:', error);

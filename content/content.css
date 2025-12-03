@@ -4,7 +4,9 @@
   position: fixed;
   top: 20px;
   right: 20px;
-  width: 320px;
+  width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
   background: white;
   border: 2px solid #667eea;
   border-radius: 8px;
@@ -58,6 +60,8 @@
 .overlay-item {
   margin-bottom: 12px;
   word-break: break-word;
+  color: #111;
+  font-size: 14px;
 }
 
 .overlay-item:last-child {
@@ -66,15 +70,140 @@
 
 .overlay-item strong {
   display: block;
-  color: #333;
+  color: #222;
   margin-bottom: 4px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 /* Visual indicators for article pages */
 body.editor-tools-article-detected {
   outline: 2px dashed #667eea;
   outline-offset: -2px;
+}
+
+/* GAM Table Styles */
+.gam-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.gam-table thead {
+  background: #f5f5f5;
+}
+
+.gam-table th {
+  padding: 8px 6px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #667eea;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gam-table td {
+  padding: 6px;
+  border-bottom: 1px solid #e0e0e0;
+  vertical-align: top;
+}
+
+.gam-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.gam-key {
+  font-weight: 500;
+  color: #222;
+  width: 40%;
+  word-break: break-word;
+}
+
+.gam-value {
+  color: #111;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+/* Collapsible Section */
+.overlay-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.overlay-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 8px 0;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+  transition: background 0.2s;
+  border-radius: 4px;
+}
+
+.overlay-toggle:hover {
+  background: #f5f5f5;
+  padding-left: 4px;
+}
+
+.overlay-toggle strong {
+  margin: 0;
+  font-size: 12px;
+}
+
+.toggle-icon {
+  font-size: 10px;
+  color: #667eea;
+  transition: transform 0.2s;
+}
+
+.overlay-collapsible {
+  max-height: 300px;
+  overflow-y: auto;
+  transition: max-height 0.3s ease;
+}
+
+.overlay-collapsible.collapsed {
+  max-height: 0;
+  overflow: hidden;
+}
+
+/* Scrollbar styling for GAM table */
+.overlay-collapsible::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overlay-collapsible::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.overlay-collapsible::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 3px;
+}
+
+.overlay-collapsible::-webkit-scrollbar-thumb:hover {
+  background: #764ba2;
+}
+
+/* Empty state */
+.overlay-empty {
+  padding: 12px;
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
 }

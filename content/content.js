@@ -103,6 +103,125 @@ function extractArticleId() {
   return null;
 }
 
+// Extract GAM key-values from script tag
+function extractGamKeyValues() {
+  try {
+    console.log('Looking for GAM data in script tags...');
+
+    // Find all script tags
+    const scripts = document.querySelectorAll('script');
+
+    for (const script of scripts) {
+      const scriptContent = script.textContent || script.innerText;
+
+      // Look for window.gam_kv assignment
+      if (scriptContent.includes('window.gam_kv')) {
+
+        // Extract the object using regex
+        // Match: window.gam_kv = { ... } (semicolon optional)
+        const match = scriptContent.match(/window\.gam_kv\s*=\s*(\{[\s\S]*?\})/);
+
+        if (match && match[1]) {
+          try {
+            // Convert JavaScript object to JSON
+            let jsonString = match[1]
+              .replace(/'/g, '"')           // Replace single quotes with double quotes
+              .replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
+
+            const gamData = JSON.parse(jsonString);
+            return gamData;
+          } catch (parseError) {
+            console.error('Error parsing GAM data:', parseError);
+            console.log('Raw match:', match[1]);
+
+            // Show the converted string for debugging
+            let debugString = match[1]
+              .replace(/'/g, '"')
+              .replace(/,(\s*[}\]])/g, '$1');
+            console.log('Converted string:', debugString);
+          }
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error extracting GAM key-values:', error);
+    return null;
+  }
+}
+
+// Extract Dotmetrics ID from script tag
+function extractDotmetricsId() {
+  try {
+    const scripts = document.querySelectorAll('script[src]');
+
+    for (const script of scripts) {
+      const src = script.getAttribute('src');
+      // Match pattern: https://script.dotmetrics.net/door.js?id=15965
+      const match = src.match(/dotmetrics\.net\/door\.js\?id=(\d+)/);
+      if (match && match[1]) {
+        return match[1]; // Return just the ID number
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error extracting Dotmetrics ID:', error);
+    return null;
+  }
+}
+
+// Simple HTML escape utility
+function escapeHtml(unsafe) {
+  if (typeof unsafe !== 'string') return unsafe;
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Format GAM key-values as HTML table
+function formatGamTable(gamData) {
+  if (!gamData || Object.keys(gamData).length === 0) {
+    return '<div class="overlay-empty">No GAM data found</div>';
+  }
+
+  let tableRows = '';
+  for (const [key, value] of Object.entries(gamData)) {
+    // Handle array values (flatten for display)
+    let displayValue = Array.isArray(value) ? value.join(', ') : value;
+
+    // Truncate long values
+    if (displayValue.length > 80) {
+      displayValue = displayValue.substring(0, 77) + '...';
+    }
+
+    tableRows += `
+      <tr>
+        <td class="gam-key">${escapeHtml(key)}</td>
+        <td class="gam-value">${escapeHtml(displayValue)}</td>
+      </tr>
+    `;
+  }
+
+  return `
+    <table class="gam-table">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+  `;
+}
+
 // Generate edit URL for article
 // Format: https://backend.svet24.si/#/article/edit/1864773
 function getEditUrl(articleId) {
@@ -119,7 +238,10 @@ function showOverlay() {
     return;
   }
 
+  // Extract all data
   const articleInfo = detectArticleInfo();
+  const gamData = extractGamKeyValues();
+  const dotmetricsId = extractDotmetricsId();
 
   overlayElement = document.createElement('div');
   overlayElement.className = 'editor-tools-overlay';
@@ -141,9 +263,25 @@ function showOverlay() {
           <strong>Page:</strong> Not an article
         </div>
       `}
+      ${dotmetricsId ? `
+        <div class="overlay-item">
+          <strong>Dotmetrics ID:</strong> ${dotmetricsId}
+        </div>
+      ` : ''}
       <div class="overlay-item">
         <strong>URL:</strong> ${window.location.pathname}
       </div>
+      ${gamData ? `
+        <div class="overlay-section">
+          <button class="overlay-toggle" id="gamToggle">
+            <span class="toggle-icon">▼</span>
+            <strong>GAM Key/Values</strong>
+          </button>
+          <div class="overlay-collapsible" id="gamContent">
+            ${formatGamTable(gamData)}
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 
@@ -155,6 +293,17 @@ function showOverlay() {
     hideOverlay();
     chrome.storage.local.set({ overlayEnabled: false });
   });
+
+  // Add GAM table toggle handler (if exists)
+  const gamToggle = document.getElementById('gamToggle');
+  if (gamToggle) {
+    gamToggle.addEventListener('click', () => {
+      const content = document.getElementById('gamContent');
+      const icon = gamToggle.querySelector('.toggle-icon');
+      content.classList.toggle('collapsed');
+      icon.textContent = content.classList.contains('collapsed') ? '▶' : '▼';
+    });
+  }
 }
 
 // Hide overlay
