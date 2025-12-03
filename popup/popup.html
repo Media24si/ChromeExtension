@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor Help Tools</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header>
+      <h1>Media24</h1>
+    </header>
+
+    <main>
+      <div class="tool-section">
+        <button id="editArticleBtn" class="tool-btn"  style="display: none;">
+          <span class="icon">✏️</span>
+          <span class="label">Edit Article</span>
+        </button>
+
+        <button id="purgeCacheBtn" class="tool-btn">
+          <span class="icon">🗑️</span>
+          <span class="label">Purge Cache</span>
+        </button>
+
+        <button id="toggleOverlayBtn" class="tool-btn">
+          <span class="icon">👁️</span>
+          <span class="label">Toggle Overlay</span>
+        </button>
+      </div>
+
+      <div id="admin-section" class="admin-tools-section" style="display: none;">
+        <div class="section-header">Admin Tools</div>
+        <button id="showApi3ArticleBtn" class="tool-btn admin-btn" style="display: none;">
+          <span class="icon">🔧</span>
+          <span class="label">Show API3 Article</span>
+        </button>
+      </div>
+
+      <div id="statusMessage" class="status-message hidden"></div>
+
+      <div class="info-section">
+        <div id="pageInfo" class="page-info">
+          <small>Loading page info...</small>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
