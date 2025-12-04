@@ -10,11 +10,10 @@
     "declarativeContent"
   ],
   "host_permissions": [
-    "http://svet24.test/*",
     "https://svet24.si/*",
     "https://*.svet24.si/*",
-    "https://*.necenzurirano.si/*",
-    "https://*.reporter.si/*",
+    "https://necenzurirano.si/*",
+    "https://reporter.si/*",
     "https://api.kme.si/*",
     "https://api3.m24.si/*"
   ],
@@ -33,11 +32,10 @@
   "content_scripts": [
     {
       "matches": [
-        "http://svet24.test/*",
         "https://svet24.si/*",
         "https://*.svet24.si/*",
-        "https://*.necenzurirano.si/*",
-        "https://*.reporter.si/*"
+        "https://necenzurirano.si/*",
+        "https://reporter.si/*"
       ],
       "js": ["config.js", "content/content.js"],
       "css": ["content/content.css"],

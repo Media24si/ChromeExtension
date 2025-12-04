@@ -8,7 +8,6 @@ const CONFIG = {
 
   // Your website domains (used for content script matching)
   SITE_DOMAINS: [
-    'svet24.test',
     'svet24.si',
     'necenzurirano.si',
     'reporter.si'

@@ -28,7 +28,6 @@ function setupDeclarativeRules() {
   chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
     // Define allowed domains
     const allowedDomains = [
-      'svet24.test',
       'svet24.si',
       'necenzurirano.si',
       'reporter.si'
@@ -65,33 +64,3 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     console.log('Tab updated:', tab.url);
   }
 });
-
-// Optional: Context menu items (right-click menu)
-// Uncomment and customize if needed
-/*
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'editArticle',
-    title: 'Edit this article',
-    contexts: ['page', 'selection']
-  });
-
-  chrome.contextMenus.create({
-    id: 'purgeCache',
-    title: 'Purge cache for this page',
-    contexts: ['page']
-  });
-});
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'editArticle') {
-    // Handle edit article
-    chrome.tabs.sendMessage(tab.id, { action: 'editArticle' });
-  } else if (info.menuItemId === 'purgeCache') {
-    // Handle purge cache
-    handlePurgeCache(tab.url).then(result => {
-      console.log('Cache purged from context menu:', result);
-    });
-  }
-});
-*/
