@@ -273,11 +273,6 @@ function updatePageInfo(data) {
     if (showApi3ArticleBtn) {
       showApi3ArticleBtn.style.display = 'inline-block';
     }
-
-    pageInfo.innerHTML = `
-      <strong>Article ID:</strong> ${data.articleId}<br>
-      <strong>URL:</strong> ${data.url}
-    `;
   } else {
     // Not an article page
     editArticleBtn.style.display = 'none';
@@ -285,9 +280,9 @@ function updatePageInfo(data) {
     if (showApi3ArticleBtn) {
       showApi3ArticleBtn.style.display = 'none';
     }
-
-    pageInfo.innerHTML = '<small>Not an article page</small>';
   }
+
+  pageInfo.innerHTML = '';
 }
 
 // Show status message
@@ -414,24 +409,42 @@ purgeCacheBtn.addEventListener('click', async () => {
     return;
   }
 
+  if (!authToken) {
+    showStatus('No auth token available', 'error');
+    return;
+  }
+
   purgeCacheBtn.disabled = true;
   purgeCacheBtn.querySelector('.label').textContent = 'Purging...';
 
   try {
-    // Send message to background script to purge cache
-    const response = await chrome.runtime.sendMessage({
-      action: 'purgeCache',
-      url: currentTab.url
+    // Strip anchor from URL (keep query params)
+    const urlWithoutAnchor = currentTab.url.split('#')[0];
+
+    // Make POST request to purge API
+    const response = await fetch('https://api.kme.si/backend/v1/purge', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `X-AUTH-TOKEN ${authToken}`
+      },
+      body: JSON.stringify({
+        url: urlWithoutAnchor
+      })
     });
 
-    if (response.success) {
-      showStatus('Cache purged successfully!', 'success');
-    } else {
-      showStatus('Failed to purge cache', 'error');
+    if (!response.ok) {
+      throw new Error(`Cache purge failed: ${response.statusText}`);
     }
+
+    showStatus('Cache purged successfully!', 'success');
+
+    // Wait 500ms and reload the page
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await chrome.tabs.reload(currentTab.id);
   } catch (error) {
     console.error('Error purging cache:', error);
-    showStatus('Error purging cache', 'error');
+    showStatus(`Error purging cache: ${error.message}`, 'error');
   } finally {
     purgeCacheBtn.disabled = false;
     purgeCacheBtn.querySelector('.label').textContent = 'Purge Cache';

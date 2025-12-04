@@ -1,6 +1,31 @@
 // Content script - runs on matching web pages
 console.log('Editor Help Tools content script loaded');
 
+// DotMetrics ID to name mapping
+const DOTMETRICS_NAMES = {
+  '14217': 'Naslovnica',
+  '3277': 'Njena',
+  '14227': 'Zdravje',
+  '14228': 'Horoskop',
+  '15965': 'Novice',
+  '15966': 'Sport',
+  '15967': 'Trendi',
+  '15968': 'Estrada',
+  '15969': 'Revije',
+  '15970': 'Kulinarika',
+  '15971': 'Vreme',
+  '15972': 'Lokalno Osrednja Slovenija',
+  '15973': 'Lokalno Dolenjska (Dolenjski list)',
+  '15974': 'Lokalno Posavje (Lokalno)',
+  '15975': 'Lokalno Primorska',
+  '15976': 'Lokalno Savinjska (Novi tednik)',
+  '15977': 'Lokalno Podravje (Štajerski tednik)',
+  '15978': 'Lokalno Pomurje (Vestnik)',
+  '15979': 'Lokalno Koroska',
+  '15980': 'Lokalno Gorenjska',
+  '15981': 'Lokalno Zasavje (Kum24)'
+};
+
 // State
 let overlayEnabled = false;
 let overlayElement = null;
@@ -40,7 +65,7 @@ async function init() {
   }
 
   // Load saved overlay state
-  const result = await chrome.storage.local.get('overlayEnabled');
+  const result = await chrome.storage.local.get(['overlayEnabled', 'gamCollapsed']);
   if (result.overlayEnabled) {
     showOverlay();
   }
@@ -172,6 +197,13 @@ function extractDotmetricsId() {
   }
 }
 
+// Get display name for DotMetrics ID
+function getDotmetricsDisplayName(id) {
+  if (!id) return null;
+  const name = DOTMETRICS_NAMES[id];
+  return name ? `${name} (${id})` : id;
+}
+
 // Simple HTML escape utility
 function escapeHtml(unsafe) {
   if (typeof unsafe !== 'string') return unsafe;
@@ -231,7 +263,7 @@ function getEditUrl(articleId) {
 }
 
 // Show overlay on page
-function showOverlay() {
+async function showOverlay() {
   if (overlayElement) {
     overlayElement.style.display = 'block';
     overlayEnabled = true;
@@ -242,6 +274,10 @@ function showOverlay() {
   const articleInfo = detectArticleInfo();
   const gamData = extractGamKeyValues();
   const dotmetricsId = extractDotmetricsId();
+
+  // Load saved GAM collapsed state
+  const result = await chrome.storage.local.get('gamCollapsed');
+  const isGamCollapsed = result.gamCollapsed || false;
 
   overlayElement = document.createElement('div');
   overlayElement.className = 'editor-tools-overlay';
@@ -255,29 +291,19 @@ function showOverlay() {
         <div class="overlay-item">
           <strong>Article ID:</strong> ${articleInfo.articleId}
         </div>
-        <div class="overlay-item">
-          <strong>Page:</strong> Article
-        </div>
-      ` : `
-        <div class="overlay-item">
-          <strong>Page:</strong> Not an article
-        </div>
-      `}
+      ` : ''}
       ${dotmetricsId ? `
         <div class="overlay-item">
-          <strong>Dotmetrics ID:</strong> ${dotmetricsId}
+          <strong>Dotmetrics ID:</strong> ${getDotmetricsDisplayName(dotmetricsId)}
         </div>
       ` : ''}
-      <div class="overlay-item">
-        <strong>URL:</strong> ${window.location.pathname}
-      </div>
       ${gamData ? `
         <div class="overlay-section">
           <button class="overlay-toggle" id="gamToggle">
-            <span class="toggle-icon">▼</span>
+            <span class="toggle-icon">${isGamCollapsed ? '▶' : '▼'}</span>
             <strong>GAM Key/Values</strong>
           </button>
-          <div class="overlay-collapsible" id="gamContent">
+          <div class="overlay-collapsible${isGamCollapsed ? ' collapsed' : ''}" id="gamContent">
             ${formatGamTable(gamData)}
           </div>
         </div>
@@ -300,8 +326,11 @@ function showOverlay() {
     gamToggle.addEventListener('click', () => {
       const content = document.getElementById('gamContent');
       const icon = gamToggle.querySelector('.toggle-icon');
-      content.classList.toggle('collapsed');
-      icon.textContent = content.classList.contains('collapsed') ? '▶' : '▼';
+      const isCollapsed = content.classList.toggle('collapsed');
+      icon.textContent = isCollapsed ? '▶' : '▼';
+
+      // Save collapsed state
+      chrome.storage.local.set({ gamCollapsed: isCollapsed });
     });
   }
 }

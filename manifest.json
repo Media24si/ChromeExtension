@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "declarativeContent"
   ],
   "host_permissions": [
     "http://svet24.test/*",

@@ -4,6 +4,9 @@ importScripts('../config.js');
 
 console.log('Editor Help Tools background service worker loaded');
 
+// Disable the action by default on all tabs
+chrome.action.disable();
+
 // Listen for extension installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
@@ -15,61 +18,39 @@ chrome.runtime.onInstalled.addListener((details) => {
   } else if (details.reason === 'update') {
     console.log('Extension updated');
   }
+
+  // Set up declarative rules to show icon only on allowed domains
+  setupDeclarativeRules();
 });
 
-// Listen for messages from popup or content scripts
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'purgeCache') {
-    handlePurgeCache(request.url)
-      .then(result => sendResponse(result))
-      .catch(error => {
-        console.error('Error in purgeCache:', error);
-        sendResponse({ success: false, error: error.message });
+// Set up rules to enable/disable extension icon based on domain
+function setupDeclarativeRules() {
+  chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
+    // Define allowed domains
+    const allowedDomains = [
+      'svet24.test',
+      'svet24.si',
+      'necenzurirano.si',
+      'reporter.si'
+    ];
+
+    // Create conditions for each allowed domain
+    const conditions = allowedDomains.map(domain => {
+      return new chrome.declarativeContent.PageStateMatcher({
+        pageUrl: { hostContains: domain }
       });
-
-    return true; // Keep message channel open for async response
-  }
-});
-
-// Handle cache purging
-async function handlePurgeCache(url) {
-  try {
-    // TODO: Customize this based on your caching infrastructure
-    // This is a placeholder implementation
-
-    // Option 1: Call your API endpoint to purge cache
-    const apiUrl = CONFIG.CACHE_PURGE_API;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add authentication headers if needed
-        // 'Authorization': 'Bearer YOUR_TOKEN'
-      },
-      body: JSON.stringify({
-        url: url,
-        timestamp: Date.now()
-      })
     });
 
-    if (!response.ok) {
-      throw new Error(`Cache purge failed: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-
-    console.log('Cache purged successfully for:', url);
-    return { success: true, data: result };
-
-  } catch (error) {
-    console.error('Cache purge error:', error);
-    // Return success for now (placeholder)
-    // Remove this when you have real API
-    return {
-      success: true,
-      message: 'Cache purge simulated (configure CONFIG.CACHE_PURGE_API for real implementation)'
+    // Create a rule that enables the action on allowed domains
+    const rule = {
+      conditions: conditions,
+      actions: [new chrome.declarativeContent.ShowAction()]
     };
-  }
+
+    // Add the rule
+    chrome.declarativeContent.onPageChanged.addRules([rule]);
+    console.log('Declarative rules set up for allowed domains');
+  });
 }
 
 // Optional: Handle browser action clicks (if you want additional behavior)
