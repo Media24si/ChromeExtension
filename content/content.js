@@ -259,7 +259,7 @@ function formatGamTable(gamData) {
 function getEditUrl(articleId) {
   if (!articleId) return null;
 
-  return `${CONFIG.CMS_URL}/#/article/edit/${articleId}`;
+  return `${CONFIG.CMS_URL}/#/article/edit/${articleId}/setresource`;
 }
 
 // Show overlay on page
