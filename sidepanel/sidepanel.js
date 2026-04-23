@@ -2,6 +2,7 @@ const STA_URL = 'https://api2.kme.si/v2/sta-articles?limit=25&page=1&query=&sect
 const RESOURCES_URL = 'https://api2.kme.si/v2/resources';
 const PUBLISHED_URL = 'https://api.kme.si/v1/articles';
 const STA_REFRESH_MS = 30000;
+const SIDEBAR_STATE_KEY = 'articleOverviewSidebarState';
 const PUBLISHED_RESOURCE_IDS = [
 	106, 110, 33, 60, 47, 41,
 	109, 100, 67, 120, 107,
@@ -29,6 +30,13 @@ let publishedSearchTerm = '';
 let publishedResourceFilter = 'all';
 let resourceNameMap = new Map();
 
+const defaultSidebarState = {
+	activeTab: 'sta',
+	staSearchTerm: '',
+	publishedSearchTerm: '',
+	publishedResourceFilter: 'all'
+};
+
 const dateFormatter = new Intl.DateTimeFormat('sl-SI', {
 	year: 'numeric',
 	month: '2-digit',
@@ -51,6 +59,38 @@ function switchTab(tabName) {
 		panel.classList.toggle('active', isActive);
 		panel.hidden = !isActive;
 	});
+}
+
+async function loadSidebarState() {
+	const result = await chrome.storage.local.get(SIDEBAR_STATE_KEY);
+	return {
+		...defaultSidebarState,
+		...(result[SIDEBAR_STATE_KEY] || {})
+	};
+}
+
+async function saveSidebarState(partialState) {
+	const currentState = await loadSidebarState();
+	const nextState = {
+		...currentState,
+		...partialState
+	};
+
+	await chrome.storage.local.set({ [SIDEBAR_STATE_KEY]: nextState });
+	return nextState;
+}
+
+function applySidebarState(state) {
+	activeTab = state.activeTab;
+	staSearchTerm = state.staSearchTerm;
+	publishedSearchTerm = state.publishedSearchTerm;
+	publishedResourceFilter = state.publishedResourceFilter;
+
+	staSearchInput.value = staSearchTerm;
+	publishedSearchInput.value = publishedSearchTerm;
+	switchTab(activeTab);
+	updateStaList();
+	updatePublishedList();
 }
 
 function normalizeArticles(payload) {
@@ -248,6 +288,7 @@ function renderPublishedFilters() {
 
 		button.addEventListener('click', () => {
 			publishedResourceFilter = filterOption.id;
+			void saveSidebarState({ publishedResourceFilter });
 			renderPublishedFilters();
 			updatePublishedList();
 		});
@@ -529,8 +570,23 @@ tabButtons.forEach((button) => {
 	button.addEventListener('click', () => {
 		const tabName = button.dataset.tab;
 		switchTab(tabName);
+		void saveSidebarState({ activeTab });
 		loadActiveTabArticles();
 	});
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+	if (areaName !== 'local' || !changes[SIDEBAR_STATE_KEY]) {
+		return;
+	}
+
+	const nextState = {
+		...defaultSidebarState,
+		...(changes[SIDEBAR_STATE_KEY].newValue || {})
+	};
+
+	applySidebarState(nextState);
+	loadActiveTabArticles();
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -541,14 +597,26 @@ document.addEventListener('visibilitychange', () => {
 
 staSearchInput.addEventListener('input', (event) => {
 	staSearchTerm = event.target.value;
+	void saveSidebarState({ staSearchTerm });
 	updateStaList();
 });
 
 publishedSearchInput.addEventListener('input', (event) => {
 	publishedSearchTerm = event.target.value;
+	void saveSidebarState({ publishedSearchTerm });
 	updatePublishedList();
 });
 
-switchTab('sta');
-loadStaArticles();
-startAutoRefresh();
+async function initializeSidebar() {
+	const savedState = await loadSidebarState();
+	applySidebarState(savedState);
+	loadActiveTabArticles();
+	startAutoRefresh();
+}
+
+initializeSidebar().catch((error) => {
+	console.error('Failed to initialize sidebar state:', error);
+	switchTab(defaultSidebarState.activeTab);
+	loadStaArticles();
+	startAutoRefresh();
+});
