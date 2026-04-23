@@ -1,17 +1,33 @@
 const STA_URL = 'https://api2.kme.si/v2/sta-articles?limit=25&page=1&query=&section=0';
+const RESOURCES_URL = 'https://api2.kme.si/v2/resources';
+const PUBLISHED_URL = 'https://api.kme.si/v1/articles';
 const STA_REFRESH_MS = 30000;
+const PUBLISHED_RESOURCE_IDS = [
+	106, 110, 33, 60, 47, 41,
+	109, 100, 67, 120, 107,
+	71, 11, 22, 118, 89
+];
 
 const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
 const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const staStatus = document.getElementById('staStatus');
 const staList = document.getElementById('staList');
 const staSearchInput = document.getElementById('staSearchInput');
+const publishedStatus = document.getElementById('publishedStatus');
+const publishedList = document.getElementById('publishedList');
+const publishedSearchInput = document.getElementById('publishedSearchInput');
+const publishedFilters = document.getElementById('publishedFilters');
 
 let activeTab = 'sta';
-let staRefreshTimer = null;
+let refreshTimer = null;
 let staLoading = false;
 let staArticles = [];
 let staSearchTerm = '';
+let publishedLoading = false;
+let publishedArticles = [];
+let publishedSearchTerm = '';
+let publishedResourceFilter = 'all';
+let resourceNameMap = new Map();
 
 const dateFormatter = new Intl.DateTimeFormat('sl-SI', {
 	year: 'numeric',
@@ -46,8 +62,13 @@ function normalizeArticles(payload) {
 		return [];
 	}
 
+	if (payload.data && Array.isArray(payload.data.list)) {
+		return payload.data.list;
+	}
+
 	const candidates = [
 		payload.data,
+		payload.list,
 		payload.items,
 		payload.payload,
 		payload.results,
@@ -110,7 +131,7 @@ function formatTags(tags) {
 
 function formatDate(value) {
 	if (!value) {
-		return 'Ni podatka';
+		return '/';
 	}
 
 	const date = new Date(value);
@@ -123,7 +144,7 @@ function formatDate(value) {
 
 function renderValue(value) {
 	if (value == null || value === '') {
-		return 'Ni podatka';
+		return '/';
 	}
 
 	return String(value);
@@ -145,6 +166,96 @@ function createMetaRow(label, value) {
 	return row;
 }
 
+function createMetaLinkRow(label, text, href) {
+	const row = document.createElement('div');
+	row.className = 'meta-row';
+
+	const labelElement = document.createElement('div');
+	labelElement.className = 'meta-label';
+	labelElement.textContent = label;
+
+	const valueElement = document.createElement('div');
+	valueElement.className = 'meta-value';
+
+	if (href) {
+		const link = document.createElement('a');
+		link.className = 'meta-link';
+		link.href = href;
+		link.target = '_blank';
+		link.rel = 'noopener noreferrer';
+		link.textContent = text;
+		valueElement.appendChild(link);
+	} else {
+		valueElement.textContent = '/';
+	}
+
+	row.append(labelElement, valueElement);
+	return row;
+}
+
+function getPublishedAuthor(item) {
+	return pickField(item, 'author') || pickField(item, 'real_author') || '';
+}
+
+function getResourceName(resourceId) {
+	if (resourceId == null || resourceId === '') {
+		return 'Ni podatka';
+	}
+
+	return resourceNameMap.get(String(resourceId)) || `Resource ${resourceId}`;
+}
+
+function getPublishedArticleUrl(item) {
+	const resourceId = String(pickField(item, 'resource_id') || '');
+	const fullUrl = pickField(item, 'full_url');
+	const articleId = pickField(item, 'id');
+
+	if (resourceId === '107') {
+		return '';
+	}
+
+	if ((resourceId === '33' || resourceId === '100' || resourceId === '71') && fullUrl) {
+		return String(fullUrl);
+	}
+
+	if (!articleId) {
+		return '';
+	}
+
+	return `https://svet24.si/clanki/test-${articleId}`;
+}
+
+function getPublishedFilterOptions() {
+	return [
+		{ id: 'all', name: 'All' },
+		...PUBLISHED_RESOURCE_IDS.map((resourceId) => ({
+			id: String(resourceId),
+			name: getResourceName(resourceId)
+		}))
+	];
+}
+
+function renderPublishedFilters() {
+	publishedFilters.innerHTML = '';
+
+	getPublishedFilterOptions().forEach((filterOption) => {
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'published-filter-button';
+		button.dataset.resourceId = filterOption.id;
+		button.textContent = filterOption.name;
+		button.classList.toggle('active', publishedResourceFilter === filterOption.id);
+
+		button.addEventListener('click', () => {
+			publishedResourceFilter = filterOption.id;
+			renderPublishedFilters();
+			updatePublishedList();
+		});
+
+		publishedFilters.appendChild(button);
+	});
+}
+
 function filterArticles(items, searchTerm) {
 	const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -159,6 +270,37 @@ function filterArticles(items, searchTerm) {
 			formatTags(pickField(item, 'tags')),
 			pickField(item, 'location'),
 			pickField(item, 'created')
+		];
+
+		return fields.some((value) =>
+			String(value || '').toLowerCase().includes(normalizedSearch)
+		);
+	});
+}
+
+function filterPublishedArticles(items, searchTerm) {
+	const normalizedSearch = searchTerm.trim().toLowerCase();
+
+	return items.filter((item) => {
+		const resourceId = String(pickField(item, 'resource_id') || '');
+		const matchesEditorial =
+			publishedResourceFilter === 'all' || resourceId === publishedResourceFilter;
+
+		if (!matchesEditorial) {
+			return false;
+		}
+
+		if (!normalizedSearch) {
+			return true;
+		}
+
+		const publishedFrom = pickField(item, 'published_from');
+		const fields = [
+			pickField(item, 'title'),
+			getResourceName(resourceId),
+			getPublishedAuthor(item),
+			publishedFrom,
+			formatDate(publishedFrom)
 		];
 
 		return fields.some((value) =>
@@ -209,8 +351,73 @@ function renderArticles(items) {
 	});
 }
 
+function renderPublishedArticles(items) {
+	publishedList.innerHTML = '';
+
+	if (!items.length) {
+		publishedStatus.textContent = publishedSearchTerm ? 'No matching published articles found.' : 'Ni zadetkov.';
+		publishedStatus.classList.remove('hidden');
+		return;
+	}
+
+	publishedStatus.classList.add('hidden');
+
+	items.forEach((item) => {
+		const title = renderValue(pickField(item, 'title'));
+		const resourceName = renderValue(getResourceName(pickField(item, 'resource_id')));
+		const author = renderValue(getPublishedAuthor(item));
+		const publishedFrom = formatDate(pickField(item, 'published_from'));
+		const articleUrl = getPublishedArticleUrl(item);
+
+		const article = document.createElement('article');
+		article.className = 'article-item';
+
+		const titleElement = document.createElement('h3');
+		titleElement.className = 'article-title';
+		titleElement.textContent = title;
+
+		const metaGrid = document.createElement('div');
+		metaGrid.className = 'meta-grid';
+		metaGrid.append(
+			createMetaRow('Editorail', resourceName),
+			createMetaRow('Author', author),
+			createMetaRow('Published', publishedFrom),
+			createMetaLinkRow('View article', 'Link', articleUrl)
+		);
+
+		article.append(titleElement, metaGrid);
+		publishedList.appendChild(article);
+	});
+}
+
 function updateStaList() {
 	renderArticles(filterArticles(staArticles, staSearchTerm));
+}
+
+function updatePublishedList() {
+	renderPublishedFilters();
+	renderPublishedArticles(filterPublishedArticles(publishedArticles, publishedSearchTerm));
+}
+
+async function loadResourceNameMap() {
+	if (resourceNameMap.size > 0) {
+		return;
+	}
+
+	const response = await fetch(RESOURCES_URL, { cache: 'no-store' });
+
+	if (!response.ok) {
+		throw new Error(`Resources request failed with ${response.status}`);
+	}
+
+	const payload = await response.json();
+	const resources = Array.isArray(payload?.data) ? payload.data : [];
+
+	resourceNameMap = new Map(
+		resources
+			.filter((resource) => resource && resource.id != null)
+			.map((resource) => [String(resource.id), resource.name || `Resource ${resource.id}`])
+	);
 }
 
 async function loadStaArticles() {
@@ -241,14 +448,79 @@ async function loadStaArticles() {
 	}
 }
 
-function startStaRefresh() {
-	if (staRefreshTimer) {
-		clearInterval(staRefreshTimer);
+async function loadPublishedArticles() {
+	if (publishedLoading) {
+		return;
 	}
 
-	staRefreshTimer = setInterval(() => {
-		if (activeTab === 'sta' && document.visibilityState === 'visible') {
-			loadStaArticles();
+	publishedLoading = true;
+	publishedStatus.textContent = 'Nalagam objavljene članke...';
+	publishedStatus.classList.remove('hidden');
+
+	try {
+		await loadResourceNameMap();
+		renderPublishedFilters();
+
+		const responses = await Promise.allSettled(
+			PUBLISHED_RESOURCE_IDS.map((resourceId) =>
+				fetch(`${PUBLISHED_URL}?resource_id=${resourceId}&limit=25&page=1`, { cache: 'no-store' })
+			)
+		);
+
+		const successfulResponses = responses.filter((result) => result.status === 'fulfilled');
+
+		if (!successfulResponses.length) {
+			throw new Error('No published article requests succeeded.');
+		}
+
+		const payloads = await Promise.all(
+			successfulResponses.map(async (result) => {
+				if (!result.value.ok) {
+					throw new Error(`Published request failed with ${result.value.status}`);
+				}
+
+				return result.value.json();
+			})
+		);
+
+		publishedArticles = payloads
+			.flatMap((payload) => normalizeArticles(payload))
+			.sort((left, right) => {
+				const leftDate = new Date(pickField(left, 'published_from')).getTime();
+				const rightDate = new Date(pickField(right, 'published_from')).getTime();
+
+				return (Number.isNaN(rightDate) ? 0 : rightDate) - (Number.isNaN(leftDate) ? 0 : leftDate);
+			});
+
+		updatePublishedList();
+	} catch (error) {
+		console.error('Failed to load published articles:', error);
+		publishedStatus.textContent = 'Napaka pri nalaganju objavljenih člankov.';
+		publishedStatus.classList.remove('hidden');
+	} finally {
+		publishedLoading = false;
+	}
+}
+
+function loadActiveTabArticles() {
+	if (activeTab === 'sta') {
+		loadStaArticles();
+		return;
+	}
+
+	if (activeTab === 'objavljeni') {
+		loadPublishedArticles();
+	}
+}
+
+function startAutoRefresh() {
+	if (refreshTimer) {
+		clearInterval(refreshTimer);
+	}
+
+	refreshTimer = setInterval(() => {
+		if (document.visibilityState === 'visible') {
+			loadActiveTabArticles();
 		}
 	}, STA_REFRESH_MS);
 }
@@ -257,16 +529,13 @@ tabButtons.forEach((button) => {
 	button.addEventListener('click', () => {
 		const tabName = button.dataset.tab;
 		switchTab(tabName);
-
-		if (tabName === 'sta') {
-			loadStaArticles();
-		}
+		loadActiveTabArticles();
 	});
 });
 
 document.addEventListener('visibilitychange', () => {
-	if (document.visibilityState === 'visible' && activeTab === 'sta') {
-		loadStaArticles();
+	if (document.visibilityState === 'visible') {
+		loadActiveTabArticles();
 	}
 });
 
@@ -275,6 +544,11 @@ staSearchInput.addEventListener('input', (event) => {
 	updateStaList();
 });
 
+publishedSearchInput.addEventListener('input', (event) => {
+	publishedSearchTerm = event.target.value;
+	updatePublishedList();
+});
+
 switchTab('sta');
 loadStaArticles();
-startStaRefresh();
+startAutoRefresh();
