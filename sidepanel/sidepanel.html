@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Article Overview</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <main class="sidepanel-shell">
+    <section class="overview-card">
+      <h2 class="eyebrow">Articles overview</h2>
+
+      <div class="tabs" role="tablist" aria-label="Article overview tabs">
+        <button class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="tab-sta" data-tab="sta">
+          STA
+        </button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-objavljeni" data-tab="objavljeni">
+          Published
+        </button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-nacrtovani" data-tab="nacrtovani">
+          Ready to publish
+        </button>
+      </div>
+
+      <section id="tab-sta" class="tab-panel active" role="tabpanel">
+        <div class="sta-search">
+          <input
+            id="staSearchInput"
+            class="sta-search-input"
+            type="search"
+            placeholder="Search"
+            aria-label="Search"
+          >
+          <p class="sta-search-note"><em>We are displaying the latest 25 STA articles.</em></p>
+        </div>
+        <div id="staStatus" class="panel-status">Nalagam STA članke...</div>
+        <div id="staList" class="article-list"></div>
+      </section>
+
+      <section id="tab-objavljeni" class="tab-panel" role="tabpanel" hidden>
+        <div class="empty-state">Placeholder</div>
+      </section>
+
+      <section id="tab-nacrtovani" class="tab-panel" role="tabpanel" hidden>
+        <div class="empty-state">Placeholder</div>
+      </section>
+    </section>
+  </main>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 // DOM elements
 const editArticleBtn = document.getElementById('editArticleBtn');
 const purgeCacheBtn = document.getElementById('purgeCacheBtn');
+const articleOverviewBtn = document.getElementById('articleOverviewBtn');
 const toggleOverlayBtn = document.getElementById('toggleOverlayBtn');
 const showApi3ArticleBtn = document.getElementById('showApi3ArticleBtn');
 const statusMessage = document.getElementById('statusMessage');
@@ -448,6 +449,31 @@ purgeCacheBtn.addEventListener('click', async () => {
   } finally {
     purgeCacheBtn.disabled = false;
     purgeCacheBtn.querySelector('.label').textContent = 'Purge Cache';
+  }
+});
+
+articleOverviewBtn.addEventListener('click', async () => {
+  if (!currentTab || !articleData || articleData.isAuthenticated === false) {
+    showStatus('Not authenticated', 'error');
+    return;
+  }
+
+  articleOverviewBtn.disabled = true;
+
+  try {
+    await chrome.sidePanel.setOptions({
+      tabId: currentTab.id,
+      path: 'sidepanel/sidepanel.html',
+      enabled: true
+    });
+
+    await chrome.sidePanel.open({ tabId: currentTab.id });
+    window.close();
+  } catch (error) {
+    console.error('Error opening article overview:', error);
+    showStatus(`Error opening article overview: ${error.message}`, 'error');
+  } finally {
+    articleOverviewBtn.disabled = false;
   }
 });
 
