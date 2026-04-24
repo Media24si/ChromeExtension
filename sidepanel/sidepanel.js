@@ -455,7 +455,7 @@ function renderPublishedArticles(items) {
 			createMetaRow('Editorail', resourceName),
 			createMetaRow('Author', author),
 			createMetaRow('Published', publishedFrom),
-			createMetaLinkRow('View article', 'Link', articleUrl)
+			createMetaLinkRow('Article', 'View →', articleUrl)
 		);
 
 		article.append(titleElement, metaGrid);
