@@ -27,14 +27,14 @@ let staSearchTerm = '';
 let publishedLoading = false;
 let publishedArticles = [];
 let publishedSearchTerm = '';
-let publishedResourceFilter = 'all';
+let publishedResourceFilters = [];
 let resourceNameMap = new Map();
 
 const defaultSidebarState = {
 	activeTab: 'sta',
 	staSearchTerm: '',
 	publishedSearchTerm: '',
-	publishedResourceFilter: 'all'
+	publishedResourceFilters: []
 };
 
 const dateFormatter = new Intl.DateTimeFormat('sl-SI', {
@@ -84,13 +84,31 @@ function applySidebarState(state) {
 	activeTab = state.activeTab;
 	staSearchTerm = state.staSearchTerm;
 	publishedSearchTerm = state.publishedSearchTerm;
-	publishedResourceFilter = state.publishedResourceFilter;
+	publishedResourceFilters = normalizePublishedResourceFilters(
+		state.publishedResourceFilters ?? state.publishedResourceFilter
+	);
 
 	staSearchInput.value = staSearchTerm;
 	publishedSearchInput.value = publishedSearchTerm;
 	switchTab(activeTab);
 	updateStaList();
 	updatePublishedList();
+}
+
+function normalizePublishedResourceFilters(value) {
+	if (Array.isArray(value)) {
+		return value
+			.map((filterValue) => String(filterValue || '').trim())
+			.filter((filterValue) => filterValue && filterValue !== 'all');
+	}
+
+	const normalizedValue = String(value || '').trim();
+
+	if (!normalizedValue || normalizedValue === 'all') {
+		return [];
+	}
+
+	return [normalizedValue];
 }
 
 function normalizeArticles(payload) {
@@ -284,11 +302,25 @@ function renderPublishedFilters() {
 		button.className = 'published-filter-button';
 		button.dataset.resourceId = filterOption.id;
 		button.textContent = filterOption.name;
-		button.classList.toggle('active', publishedResourceFilter === filterOption.id);
+		const isAllButton = filterOption.id === 'all';
+		const isActive = isAllButton
+			? publishedResourceFilters.length === 0
+			: publishedResourceFilters.includes(filterOption.id);
+		button.classList.toggle('active', isActive);
+		button.setAttribute('aria-pressed', String(isActive));
 
 		button.addEventListener('click', () => {
-			publishedResourceFilter = filterOption.id;
-			void saveSidebarState({ publishedResourceFilter });
+			if (isAllButton) {
+				publishedResourceFilters = [];
+			} else if (publishedResourceFilters.includes(filterOption.id)) {
+				publishedResourceFilters = publishedResourceFilters.filter(
+					(resourceId) => resourceId !== filterOption.id
+				);
+			} else {
+				publishedResourceFilters = [...publishedResourceFilters, filterOption.id];
+			}
+
+			void saveSidebarState({ publishedResourceFilters });
 			renderPublishedFilters();
 			updatePublishedList();
 		});
@@ -325,7 +357,7 @@ function filterPublishedArticles(items, searchTerm) {
 	return items.filter((item) => {
 		const resourceId = String(pickField(item, 'resource_id') || '');
 		const matchesEditorial =
-			publishedResourceFilter === 'all' || resourceId === publishedResourceFilter;
+			publishedResourceFilters.length === 0 || publishedResourceFilters.includes(resourceId);
 
 		if (!matchesEditorial) {
 			return false;

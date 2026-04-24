@@ -176,6 +176,7 @@ body {
 .meta-link {
   color: inherit;
   text-decoration: none;
+  color: var(--color-orange-500);
 }
 
 .meta-link:hover {
@@ -206,14 +207,15 @@ body {
   font-size: 0.9em;
   line-height: 1.3;
   text-transform: uppercase;
-  font-weight: 700;
+  font-weight: 400;
+  color: var(--color-gray-600);
 }
 
 .meta-value {
   font-size: 1.1em;
   line-height: 1.3;
   word-break: break-word;
-  color: var(--color-orange-500);
+  color: var(--color-black);
     font-weight: 700;
 }
 
