@@ -10,6 +10,7 @@
   <main class="sidepanel-shell">
     <div class="sticky-top-box">
       <h2 class="eyebrow">Articles overview</h2>
+      <div id="unauthenticatedStatus" class="panel-status hidden">Not authenticated - please log in to the backend.</div>
 
       <div class="tabs" role="tablist" aria-label="Article overview tabs">
         <button class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="tab-sta" data-tab="sta">
@@ -18,9 +19,9 @@
         <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-objavljeni" data-tab="objavljeni">
           Published
         </button>
-        <!--<button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-nacrtovani" data-tab="nacrtovani">
+        <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-nacrtovani" data-tab="nacrtovani">
           Ready to publish
-        </button>-->
+        </button>
       </div>
     </div>
     <section class="overview-card">
@@ -35,7 +36,7 @@
           >
           <p class="sta-search-note"><em>We are displaying the latest 25 STA articles.</em></p>
         </div>
-        <div id="staStatus" class="panel-status">Nalagam STA članke...</div>
+        <div id="staStatus" class="panel-status">Loading STA articles...</div>
         <div id="staList" class="article-list"></div>
       </section>
 
@@ -52,13 +53,26 @@
         </div>
         <p class="tag-main">Editorials filters:</p>
         <div id="publishedFilters" class="published-filters" role="group" aria-label="Filter by editorials"></div>
-        <div id="publishedStatus" class="panel-status">Nalagam objavljene članke...</div>
+        <div id="publishedStatus" class="panel-status">Loading published articles...</div>
         <div id="publishedList" class="article-list"></div>
       </section>
 
-      <!--<section id="tab-nacrtovani" class="tab-panel" role="tabpanel" hidden>
-        <div class="empty-state">Coming soon...</div>
-      </section>-->
+      <section id="tab-nacrtovani" class="tab-panel" role="tabpanel" hidden>
+        <div class="sta-search">
+          <input
+            id="readyToPublishSearchInput"
+            class="sta-search-input"
+            type="search"
+            placeholder="Search"
+            aria-label="Search ready to publish articles"
+          >
+          <p class="sta-search-note"><em>We display ready-to-publish backend articles from each editorial.</em></p>
+        </div>
+        <p class="tag-main">Editorials filters:</p>
+        <div id="readyToPublishFilters" class="published-filters" role="group" aria-label="Filter ready to publish by editorials"></div>
+        <div id="readyToPublishStatus" class="panel-status">Loading ready-to-publish articles...</div>
+        <div id="readyToPublishList" class="article-list"></div>
+      </section>
     </section>
   </main>
 

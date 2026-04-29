@@ -14,6 +14,7 @@ let currentTab = null;
 let articleData = null;
 let userData = null;
 let authToken = null;
+const SIDEPANEL_AUTH_CONTEXT_KEY = 'sidepanelAuthContext';
 
 // === AUTHENTICATION CACHE MANAGER ===
 const AuthCache = {
@@ -369,7 +370,7 @@ function showNotAuthenticated(reason = 'Not authenticated') {
     </small>
   `;
 
-  showStatus('Not authenticated - please log in', 'error', false);
+  showStatus('Not authenticated - please log in to the backend.', 'error', false);
 }
 
 /**
@@ -458,9 +459,22 @@ articleOverviewBtn.addEventListener('click', async () => {
     return;
   }
 
+  if (!authToken) {
+    showStatus('No auth token available', 'error');
+    return;
+  }
+
   articleOverviewBtn.disabled = true;
 
   try {
+    await chrome.storage.local.set({
+      [SIDEPANEL_AUTH_CONTEXT_KEY]: {
+        tabId: currentTab.id,
+        authToken,
+        timestamp: Date.now()
+      }
+    });
+
     await chrome.sidePanel.setOptions({
       tabId: currentTab.id,
       path: 'sidepanel/sidepanel.html',
