@@ -16,26 +16,25 @@ const tabPanels = Array.from(document.querySelectorAll('.tab-panel'));
 const tabsContainer = document.querySelector('.tabs');
 const overviewCard = document.querySelector('.overview-card');
 const unauthenticatedStatus = document.getElementById('unauthenticatedStatus');
-const staStatus = document.getElementById('staStatus');
-const staList = document.getElementById('staList');
-const staSearchInput = document.getElementById('staSearchInput');
-const publishedStatus = document.getElementById('publishedStatus');
-const publishedList = document.getElementById('publishedList');
-const publishedSearchInput = document.getElementById('publishedSearchInput');
+const overviewStatus = document.getElementById('overviewStatus');
+const overviewList = document.getElementById('overviewList');
+const overviewSearchInput = document.getElementById('overviewSearchInput');
+const overviewSourceFiltersContainer = document.getElementById('overviewSourceFilters');
+const publishedEditorialFiltersBlock = document.getElementById('publishedEditorialFiltersBlock');
 const publishedFilters = document.getElementById('publishedFilters');
 const readyToPublishFilters = document.getElementById('readyToPublishFilters');
 const readyToPublishStatus = document.getElementById('readyToPublishStatus');
 const readyToPublishList = document.getElementById('readyToPublishList');
 const readyToPublishSearchInput = document.getElementById('readyToPublishSearchInput');
 
-let activeTab = 'sta';
+let activeTab = 'overview';
 let refreshTimer = null;
 let staLoading = false;
 let staArticles = [];
-let staSearchTerm = '';
 let publishedLoading = false;
 let publishedArticles = [];
-let publishedSearchTerm = '';
+let overviewSearchTerm = '';
+let overviewSourceFilters = ['sta', 'published'];
 let publishedResourceFilters = [];
 let readyToPublishLoading = false;
 let readyToPublishArticles = [];
@@ -44,9 +43,9 @@ let readyToPublishResourceFilters = [];
 let resourceNameMap = new Map();
 
 const defaultSidebarState = {
-	activeTab: 'sta',
-	staSearchTerm: '',
-	publishedSearchTerm: '',
+	activeTab: 'overview',
+	overviewSearchTerm: '',
+	overviewSourceFilters: ['sta', 'published'],
 	publishedResourceFilters: [],
 	readyToPublishResourceFilters: [],
 	readyToPublishSearchTerm: ''
@@ -96,26 +95,42 @@ async function saveSidebarState(partialState) {
 }
 
 function applySidebarState(state) {
-	activeTab = state.activeTab;
-	staSearchTerm = state.staSearchTerm;
-	publishedSearchTerm = state.publishedSearchTerm;
+	activeTab = (state.activeTab === 'nacrtovani') ? 'nacrtovani' : 'overview';
+	overviewSearchTerm = state.overviewSearchTerm || state.publishedSearchTerm || state.staSearchTerm || '';
+	overviewSourceFilters = normalizeSourceFilters(state.overviewSourceFilters);
 	publishedResourceFilters = normalizeResourceFilters(
 		state.publishedResourceFilters ?? state.publishedResourceFilter
 	);
 	readyToPublishResourceFilters = normalizeResourceFilters(
 		state.readyToPublishResourceFilters ?? state.readyToPublishResourceFilter
 	);
+	const synchronizedEditorialFilters = Array.from(
+		new Set([...publishedResourceFilters, ...readyToPublishResourceFilters])
+	);
+	publishedResourceFilters = synchronizedEditorialFilters;
+	readyToPublishResourceFilters = [...synchronizedEditorialFilters];
 	readyToPublishSearchTerm = state.readyToPublishSearchTerm || '';
 
-	staSearchInput.value = staSearchTerm;
-	publishedSearchInput.value = publishedSearchTerm;
+	overviewSearchInput.value = overviewSearchTerm;
 	if (readyToPublishSearchInput) {
 		readyToPublishSearchInput.value = readyToPublishSearchTerm;
 	}
 	switchTab(activeTab);
-	updateStaList();
-	updatePublishedList();
+	updateOverviewList();
 	updateReadyToPublishList();
+}
+
+function normalizeSourceFilters(value) {
+	if (!Array.isArray(value) || !value.length) {
+		return ['sta', 'published'];
+	}
+
+	const allowed = new Set(['sta', 'published']);
+	const normalized = value
+		.map((filterValue) => String(filterValue || '').trim().toLowerCase())
+		.filter((filterValue) => allowed.has(filterValue));
+
+	return normalized.length ? Array.from(new Set(normalized)) : ['sta', 'published'];
 }
 
 function normalizeResourceFilters(value) {
@@ -132,6 +147,32 @@ function normalizeResourceFilters(value) {
 	}
 
 	return [normalizedValue];
+}
+
+function getSynchronizedEditorialFilters(nextFilters) {
+	return Array.from(
+		new Set(
+			(nextFilters || [])
+				.map((filterValue) => String(filterValue || '').trim())
+				.filter((filterValue) => filterValue && filterValue !== 'all')
+		)
+	);
+}
+
+async function setSharedEditorialFilters(nextFilters) {
+	const synchronizedFilters = getSynchronizedEditorialFilters(nextFilters);
+	publishedResourceFilters = synchronizedFilters;
+	readyToPublishResourceFilters = [...synchronizedFilters];
+
+	await saveSidebarState({
+		publishedResourceFilters: synchronizedFilters,
+		readyToPublishResourceFilters: synchronizedFilters
+	});
+
+	renderPublishedFilters();
+	renderReadyToPublishFilters();
+	updateOverviewList();
+	updateReadyToPublishList();
 }
 
 function normalizeArticles(payload) {
@@ -333,23 +374,72 @@ function renderPublishedFilters() {
 		button.setAttribute('aria-pressed', String(isActive));
 
 		button.addEventListener('click', () => {
+			let nextFilters;
 			if (isAllButton) {
-				publishedResourceFilters = [];
+				nextFilters = [];
 			} else if (publishedResourceFilters.includes(filterOption.id)) {
-				publishedResourceFilters = publishedResourceFilters.filter(
+				nextFilters = publishedResourceFilters.filter(
 					(resourceId) => resourceId !== filterOption.id
 				);
 			} else {
-				publishedResourceFilters = [...publishedResourceFilters, filterOption.id];
+				nextFilters = [...publishedResourceFilters, filterOption.id];
 			}
 
-			void saveSidebarState({ publishedResourceFilters });
-			renderPublishedFilters();
-			updatePublishedList();
+			void setSharedEditorialFilters(nextFilters);
 		});
 
 		publishedFilters.appendChild(button);
 	});
+}
+
+function getOverviewSourceFilterOptions() {
+	return [
+		{ id: 'sta', name: 'STA' },
+		{ id: 'published', name: 'Published' }
+	];
+}
+
+function renderOverviewSourceFilters() {
+	if (!overviewSourceFiltersContainer) {
+		return;
+	}
+
+	overviewSourceFiltersContainer.innerHTML = '';
+
+	getOverviewSourceFilterOptions().forEach((filterOption) => {
+		const button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'source-filter-button';
+		button.dataset.sourceType = filterOption.id;
+		button.textContent = filterOption.name;
+
+		const isActive = overviewSourceFilters.includes(filterOption.id);
+		button.classList.toggle('active', isActive);
+		button.setAttribute('aria-pressed', String(isActive));
+
+		button.addEventListener('click', () => {
+			if (overviewSourceFilters.includes(filterOption.id)) {
+				overviewSourceFilters = overviewSourceFilters.filter((value) => value !== filterOption.id);
+			} else {
+				overviewSourceFilters = [...overviewSourceFilters, filterOption.id];
+			}
+
+			void saveSidebarState({ overviewSourceFilters });
+			renderOverviewSourceFilters();
+			updateOverviewList();
+		});
+
+		overviewSourceFiltersContainer.appendChild(button);
+	});
+}
+
+function syncPublishedEditorialFiltersVisibility() {
+	if (!publishedEditorialFiltersBlock) {
+		return;
+	}
+
+	const shouldShow = overviewSourceFilters.includes('published');
+	publishedEditorialFiltersBlock.classList.toggle('hidden', !shouldShow);
 }
 
 function getReadyToPublishFilterOptions() {
@@ -385,75 +475,179 @@ function renderReadyToPublishFilters() {
 		button.setAttribute('aria-pressed', String(isActive));
 
 		button.addEventListener('click', () => {
+			let nextFilters;
 			if (isAllButton) {
-				readyToPublishResourceFilters = [];
+				nextFilters = [];
 			} else if (readyToPublishResourceFilters.includes(filterOption.id)) {
-				readyToPublishResourceFilters = readyToPublishResourceFilters.filter(
+				nextFilters = readyToPublishResourceFilters.filter(
 					(resourceId) => resourceId !== filterOption.id
 				);
 			} else {
-				readyToPublishResourceFilters = [...readyToPublishResourceFilters, filterOption.id];
+				nextFilters = [...readyToPublishResourceFilters, filterOption.id];
 			}
 
-			void saveSidebarState({ readyToPublishResourceFilters });
-			renderReadyToPublishFilters();
-			updateReadyToPublishList();
+			void setSharedEditorialFilters(nextFilters);
 		});
 
 		readyToPublishFilters.appendChild(button);
 	});
 }
 
-function filterArticles(items, searchTerm) {
-	const normalizedSearch = searchTerm.trim().toLowerCase();
-
-	if (!normalizedSearch) {
-		return items;
-	}
-
-	return items.filter((item) => {
-		const fields = [
-			pickField(item, 'title'),
-			pickField(item, 'subtitle'),
-			formatTags(pickField(item, 'tags')),
-			pickField(item, 'location'),
-			pickField(item, 'created')
-		];
-
-		return fields.some((value) =>
-			String(value || '').toLowerCase().includes(normalizedSearch)
-		);
-	});
+function getOverviewTimestampMs(entry) {
+	const rawValue = entry.source === 'sta'
+		? pickField(entry.item, 'created')
+		: pickField(entry.item, 'published_from');
+	const parsed = new Date(rawValue).getTime();
+	return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
 }
 
-function filterPublishedArticles(items, searchTerm) {
+function getOverviewItems() {
+	const staEntries = staArticles.map((item) => ({ source: 'sta', item }));
+	const publishedEntries = publishedArticles.map((item) => ({ source: 'published', item }));
+
+	return [...staEntries, ...publishedEntries].sort(
+		(left, right) => getOverviewTimestampMs(right) - getOverviewTimestampMs(left)
+	);
+}
+
+function matchesOverviewSearch(entry, normalizedSearch) {
+	if (!normalizedSearch) {
+		return true;
+	}
+
+	if (entry.source === 'sta') {
+		const fields = [
+			pickField(entry.item, 'title'),
+			pickField(entry.item, 'subtitle'),
+			formatTags(pickField(entry.item, 'tags')),
+			pickField(entry.item, 'location'),
+			pickField(entry.item, 'created')
+		];
+
+		return fields.some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
+	}
+
+	const resourceId = String(pickField(entry.item, 'resource_id') || '');
+	const publishedFrom = pickField(entry.item, 'published_from');
+	const fields = [
+		pickField(entry.item, 'title'),
+		getResourceName(resourceId),
+		getPublishedAuthor(entry.item),
+		publishedFrom,
+		formatDate(publishedFrom)
+	];
+
+	return fields.some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
+}
+
+function filterOverviewItems(items, searchTerm) {
 	const normalizedSearch = searchTerm.trim().toLowerCase();
 
-	return items.filter((item) => {
-		const resourceId = String(pickField(item, 'resource_id') || '');
-		const matchesEditorial =
-			publishedResourceFilters.length === 0 || publishedResourceFilters.includes(resourceId);
-
-		if (!matchesEditorial) {
+	return items.filter((entry) => {
+		if (!overviewSourceFilters.includes(entry.source)) {
 			return false;
 		}
 
-		if (!normalizedSearch) {
-			return true;
+		if (entry.source === 'published') {
+			const resourceId = String(pickField(entry.item, 'resource_id') || '');
+			const matchesEditorial =
+				publishedResourceFilters.length === 0 || publishedResourceFilters.includes(resourceId);
+
+			if (!matchesEditorial) {
+				return false;
+			}
 		}
 
-		const publishedFrom = pickField(item, 'published_from');
-		const fields = [
-			pickField(item, 'title'),
-			getResourceName(resourceId),
-			getPublishedAuthor(item),
-			publishedFrom,
-			formatDate(publishedFrom)
-		];
+		return matchesOverviewSearch(entry, normalizedSearch);
+	});
+}
 
-		return fields.some((value) =>
-			String(value || '').toLowerCase().includes(normalizedSearch)
-		);
+function hasStaUsedFor(item) {
+	const usedFor = pickField(item, 'used_for');
+
+	if (usedFor == null) {
+		return false;
+	}
+
+	if (Array.isArray(usedFor)) {
+		return usedFor.length > 0;
+	}
+
+	const normalized = String(usedFor).trim().toLowerCase();
+	return normalized !== '' && normalized !== 'null';
+}
+
+function createSourceTag(sourceType, item) {
+	const tag = document.createElement('span');
+	tag.className = `source-tag source-tag--${sourceType}`;
+
+	if (sourceType === 'sta' && hasStaUsedFor(item)) {
+		tag.innerHTML = 'STA <span class="source-tag-used">(&#10004; used)</span>';
+	} else {
+		tag.textContent = sourceType === 'sta' ? 'STA' : 'Published';
+	}
+
+	return tag;
+}
+
+function renderOverviewArticles(items) {
+	overviewList.innerHTML = '';
+
+	if (!items.length) {
+		overviewStatus.textContent = overviewSearchTerm
+			? 'No matching overview articles found.'
+			: 'Ni zadetkov.';
+		overviewStatus.classList.remove('hidden');
+		return;
+	}
+
+	overviewStatus.classList.add('hidden');
+
+	items.forEach((entry) => {
+		const article = document.createElement('article');
+		article.className = `article-item article-item--${entry.source}`;
+
+		const titleElement = document.createElement('h3');
+		titleElement.className = 'article-title';
+		titleElement.textContent = renderValue(pickField(entry.item, 'title'));
+
+		article.append(createSourceTag(entry.source, entry.item), titleElement);
+
+		if (entry.source === 'sta') {
+			const subtitle = pickField(entry.item, 'subtitle');
+			if (subtitle) {
+				const subtitleElement = document.createElement('p');
+				subtitleElement.className = 'article-subtitle';
+				subtitleElement.textContent = String(subtitle);
+				article.appendChild(subtitleElement);
+			}
+
+			const metaGrid = document.createElement('div');
+			metaGrid.className = 'meta-grid';
+			metaGrid.append(
+				createMetaRow('Tags', renderValue(formatTags(pickField(entry.item, 'tags')))),
+				createMetaRow('Location', renderValue(pickField(entry.item, 'location'))),
+				createMetaRow('Created', formatDate(pickField(entry.item, 'created')))
+			);
+			article.appendChild(metaGrid);
+		} else {
+			const resourceName = renderValue(getResourceName(pickField(entry.item, 'resource_id')));
+			const author = renderValue(getPublishedAuthor(entry.item));
+			const publishedFrom = formatDate(pickField(entry.item, 'published_from'));
+			const articleUrl = getPublishedArticleUrl(entry.item);
+
+			const metaGrid = document.createElement('div');
+			metaGrid.className = 'meta-grid';
+			metaGrid.append(
+				createMetaRow('Editorial', resourceName),
+				createMetaRow('Author', author),
+				createMetaRow('Published', publishedFrom),
+				createMetaLinkRow('Article', 'View ->', articleUrl)
+			);
+			article.appendChild(metaGrid);
+		}
+
+		overviewList.appendChild(article);
 	});
 }
 
@@ -462,7 +656,11 @@ function getReadyToPublishTimestamp(item) {
 }
 
 function getReadyToPublishTimestampMs(item) {
-	const timestamp = getReadyToPublishTimestamp(item);
+	const timestamp = String(getReadyToPublishTimestamp(item) || '').trim();
+	if (!timestamp) {
+		return null;
+	}
+
 	const parsedTimestamp = new Date(timestamp).getTime();
 	return Number.isNaN(parsedTimestamp) ? null : parsedTimestamp;
 }
@@ -533,87 +731,6 @@ function filterReadyToPublishArticles(items, searchTerm) {
 	});
 }
 
-function renderArticles(items) {
-	staList.innerHTML = '';
-
-	if (!items.length) {
-		staStatus.textContent = staSearchTerm ? 'No matching STA articles found.' : 'Ni zadetkov.';
-		staStatus.classList.remove('hidden');
-		return;
-	}
-
-	staStatus.classList.add('hidden');
-
-	items.forEach((item) => {
-		const title = renderValue(pickField(item, 'title'));
-		const subtitle = renderValue(pickField(item, 'subtitle'));
-		const tags = renderValue(formatTags(pickField(item, 'tags')));
-		const location = renderValue(pickField(item, 'location'));
-		const created = formatDate(pickField(item, 'created'));
-
-		const article = document.createElement('article');
-		article.className = 'article-item';
-
-		const titleElement = document.createElement('h3');
-		titleElement.className = 'article-title';
-		titleElement.textContent = title;
-
-		const subtitleElement = document.createElement('p');
-		subtitleElement.className = 'article-subtitle';
-		subtitleElement.textContent = subtitle;
-
-		const metaGrid = document.createElement('div');
-		metaGrid.className = 'meta-grid';
-		metaGrid.append(
-			createMetaRow('Tags', tags),
-			createMetaRow('Location', location),
-			createMetaRow('Created', created)
-		);
-
-		article.append(titleElement, subtitleElement, metaGrid);
-		staList.appendChild(article);
-	});
-}
-
-function renderPublishedArticles(items) {
-	publishedList.innerHTML = '';
-
-	if (!items.length) {
-		publishedStatus.textContent = publishedSearchTerm ? 'No matching published articles found.' : 'Ni zadetkov.';
-		publishedStatus.classList.remove('hidden');
-		return;
-	}
-
-	publishedStatus.classList.add('hidden');
-
-	items.forEach((item) => {
-		const title = renderValue(pickField(item, 'title'));
-		const resourceName = renderValue(getResourceName(pickField(item, 'resource_id')));
-		const author = renderValue(getPublishedAuthor(item));
-		const publishedFrom = formatDate(pickField(item, 'published_from'));
-		const articleUrl = getPublishedArticleUrl(item);
-
-		const article = document.createElement('article');
-		article.className = 'article-item';
-
-		const titleElement = document.createElement('h3');
-		titleElement.className = 'article-title';
-		titleElement.textContent = title;
-
-		const metaGrid = document.createElement('div');
-		metaGrid.className = 'meta-grid';
-		metaGrid.append(
-			createMetaRow('Editorail', resourceName),
-			createMetaRow('Author', author),
-			createMetaRow('Published', publishedFrom),
-			createMetaLinkRow('Article', 'View →', articleUrl)
-		);
-
-		article.append(titleElement, metaGrid);
-		publishedList.appendChild(article);
-	});
-}
-
 function renderReadyToPublishArticles(items) {
 	readyToPublishList.innerHTML = '';
 
@@ -653,8 +770,7 @@ function renderReadyToPublishArticles(items) {
 		metaGrid.append(
 			createMetaRow('Editorial', resourceName),
 			createMetaRow('Author', author),
-			createMetaRow('Publish from', publishedFrom),
-			createMetaRow('ID', renderValue(pickField(item, 'id')))
+			createMetaRow('Publish from', publishedFrom)
 		);
 
 		article.prepend(titleElement);
@@ -663,13 +779,12 @@ function renderReadyToPublishArticles(items) {
 	});
 }
 
-function updateStaList() {
-	renderArticles(filterArticles(staArticles, staSearchTerm));
-}
 
-function updatePublishedList() {
+function updateOverviewList() {
+	syncPublishedEditorialFiltersVisibility();
+	renderOverviewSourceFilters();
 	renderPublishedFilters();
-	renderPublishedArticles(filterPublishedArticles(publishedArticles, publishedSearchTerm));
+	renderOverviewArticles(filterOverviewItems(getOverviewItems(), overviewSearchTerm));
 }
 
 function updateReadyToPublishList() {
@@ -680,11 +795,17 @@ function updateReadyToPublishList() {
 }
 
 function buildReadyToPublishUrl(resourceId) {
+	const publishedFrom = Date.now();
+	const publishedTill = publishedFrom + 2 * 24 * 60 * 60 * 1000;
+
 	const params = new URLSearchParams({
 		resource_id: String(resourceId),
-		filter_resource_id: '0',
-		filter_section_id: '0',
-		hide_unactive: '0'
+		hide_unactive: '0',
+		limit: '25',
+		page: '1',
+		order: 'asc',
+		published_from: String(publishedFrom),
+		published_till: String(publishedTill)
 	});
 
 	return `${READY_TO_PUBLISH_BASE_URL}?${params.toString()}`;
@@ -710,12 +831,12 @@ function clearReadyToPublishData() {
 
 function clearStaData() {
 	staArticles = [];
-	updateStaList();
+	updateOverviewList();
 }
 
 function clearPublishedData() {
 	publishedArticles = [];
-	updatePublishedList();
+	updateOverviewList();
 }
 
 function showUnauthenticatedView(message) {
@@ -842,8 +963,8 @@ async function loadStaArticles() {
 	}
 
 	staLoading = true;
-	staStatus.textContent = 'Loading STA articles...';
-	staStatus.classList.remove('hidden');
+	overviewStatus.textContent = 'Loading...';
+	overviewStatus.classList.remove('hidden');
 
 	try {
 		const response = await fetch(STA_URL, { cache: 'no-store' });
@@ -854,11 +975,11 @@ async function loadStaArticles() {
 
 		const payload = await response.json();
 		staArticles = normalizeArticles(payload);
-		updateStaList();
+		updateOverviewList();
 	} catch (error) {
 		console.error('Failed to load STA articles:', error);
-		staStatus.textContent = 'Failed to load STA articles.';
-		staStatus.classList.remove('hidden');
+		overviewStatus.textContent = 'Failed to load.';
+		overviewStatus.classList.remove('hidden');
 	} finally {
 		staLoading = false;
 	}
@@ -870,8 +991,8 @@ async function loadPublishedArticles() {
 	}
 
 	publishedLoading = true;
-	publishedStatus.textContent = 'Loading published articles...';
-	publishedStatus.classList.remove('hidden');
+	overviewStatus.textContent = 'Loading...';
+	overviewStatus.classList.remove('hidden');
 
 	try {
 		await loadResourceNameMap();
@@ -908,14 +1029,26 @@ async function loadPublishedArticles() {
 				return (Number.isNaN(rightDate) ? 0 : rightDate) - (Number.isNaN(leftDate) ? 0 : leftDate);
 			});
 
-		updatePublishedList();
+		updateOverviewList();
 	} catch (error) {
 		console.error('Failed to load published articles:', error);
-		publishedStatus.textContent = 'Failed to load published articles.';
-		publishedStatus.classList.remove('hidden');
+		overviewStatus.textContent = 'Failed to load overview articles.';
+		overviewStatus.classList.remove('hidden');
 	} finally {
 		publishedLoading = false;
 	}
+}
+
+async function loadOverviewArticles() {
+	overviewStatus.textContent = 'Loading overview articles...';
+	overviewStatus.classList.remove('hidden');
+
+	await Promise.allSettled([
+		loadStaArticles(),
+		loadPublishedArticles()
+	]);
+
+	updateOverviewList();
 }
 
 async function loadReadyToPublishArticles() {
@@ -924,7 +1057,7 @@ async function loadReadyToPublishArticles() {
 	}
 
 	readyToPublishLoading = true;
-	readyToPublishStatus.textContent = 'Loading ready-to-publish articles...';
+	readyToPublishStatus.textContent = 'Loading...';
 	readyToPublishStatus.classList.remove('hidden');
 
 	try {
@@ -984,11 +1117,12 @@ async function loadReadyToPublishArticles() {
 			throw new Error('No ready-to-publish requests succeeded.');
 		}
 
-		const now = Date.now();
-		const windowEnd = now + 10 * 24 * 60 * 60 * 1000;
+		const nowMs = Date.now();
+		const windowStart = nowMs;
+		const windowEnd = nowMs + 2 * 24 * 60 * 60 * 1000;
 		const isInReadyWindow = (item) => {
 			const timestampMs = getReadyToPublishTimestampMs(item);
-			return timestampMs != null && timestampMs >= now && timestampMs <= windowEnd;
+			return timestampMs != null && timestampMs >= windowStart && timestampMs <= windowEnd;
 		};
 
 		const mergedReadyItems = successfulPayloads
@@ -1049,7 +1183,7 @@ async function loadReadyToPublishArticles() {
 		readyToPublishArticles = Array.from(dedupedReadyItemsByKey.values())
 			.filter((item) => {
 				const timestampMs = getReadyToPublishTimestampMs(item);
-				return timestampMs != null && timestampMs >= now && timestampMs <= windowEnd;
+				return timestampMs != null && timestampMs >= windowStart && timestampMs <= windowEnd;
 			})
 			.sort((left, right) => {
 				const leftTimestampMs = getReadyToPublishTimestampMs(left);
@@ -1104,13 +1238,8 @@ async function loadActiveTabArticles() {
 		});
 	}
 
-	if (activeTab === 'sta') {
-		loadStaArticles();
-		return;
-	}
-
-	if (activeTab === 'objavljeni') {
-		loadPublishedArticles();
+	if (activeTab === 'overview') {
+		void loadOverviewArticles();
 		return;
 	}
 
@@ -1160,16 +1289,10 @@ document.addEventListener('visibilitychange', () => {
 	}
 });
 
-staSearchInput.addEventListener('input', (event) => {
-	staSearchTerm = event.target.value;
-	void saveSidebarState({ staSearchTerm });
-	updateStaList();
-});
-
-publishedSearchInput.addEventListener('input', (event) => {
-	publishedSearchTerm = event.target.value;
-	void saveSidebarState({ publishedSearchTerm });
-	updatePublishedList();
+overviewSearchInput.addEventListener('input', (event) => {
+	overviewSearchTerm = event.target.value;
+	void saveSidebarState({ overviewSearchTerm });
+	updateOverviewList();
 });
 
 if (readyToPublishSearchInput) {
@@ -1190,6 +1313,6 @@ async function initializeSidebar() {
 initializeSidebar().catch((error) => {
 	console.error('Failed to initialize sidebar state:', error);
 	switchTab(defaultSidebarState.activeTab);
-	loadStaArticles();
+	void loadOverviewArticles();
 	startAutoRefresh();
 });

@@ -13,11 +13,8 @@
       <div id="unauthenticatedStatus" class="panel-status hidden">Not authenticated - please log in to the backend.</div>
 
       <div class="tabs" role="tablist" aria-label="Article overview tabs">
-        <button class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="tab-sta" data-tab="sta">
-          STA
-        </button>
-        <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-objavljeni" data-tab="objavljeni">
-          Published
+        <button class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="tab-overview" data-tab="overview">
+          STA and Published
         </button>
         <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="tab-nacrtovani" data-tab="nacrtovani">
           Ready to publish
@@ -25,36 +22,22 @@
       </div>
     </div>
     <section class="overview-card">
-      <section id="tab-sta" class="tab-panel active" role="tabpanel">
+      <section id="tab-overview" class="tab-panel active" role="tabpanel">
         <div class="sta-search">
           <input
-            id="staSearchInput"
+            id="overviewSearchInput"
             class="sta-search-input"
             type="search"
             placeholder="Search"
-            aria-label="Search"
+            aria-label="Search overview articles"
           >
-          <p class="sta-search-note"><em>We are displaying the latest 25 STA articles.</em></p>
         </div>
-        <div id="staStatus" class="panel-status">Loading STA articles...</div>
-        <div id="staList" class="article-list"></div>
-      </section>
-
-      <section id="tab-objavljeni" class="tab-panel" role="tabpanel" hidden>
-        <div class="sta-search">
-          <input
-            id="publishedSearchInput"
-            class="sta-search-input"
-            type="search"
-            placeholder="Search"
-            aria-label="Search published articles"
-          >
-          <p class="sta-search-note"><em>We display the 25 most recently published articles from each editorial.</em></p>
+        <div id="overviewSourceFilters" class="published-filters" role="group" aria-label="Filter by source type"></div>
+        <div id="publishedEditorialFiltersBlock">
+          <div id="publishedFilters" class="published-filters editorials-filters" role="group" aria-label="Filter published articles by editorials"></div>
         </div>
-        <p class="tag-main">Editorials filters:</p>
-        <div id="publishedFilters" class="published-filters" role="group" aria-label="Filter by editorials"></div>
-        <div id="publishedStatus" class="panel-status">Loading published articles...</div>
-        <div id="publishedList" class="article-list"></div>
+        <div id="overviewStatus" class="panel-status">Loading...</div>
+        <div id="overviewList" class="article-list"></div>
       </section>
 
       <section id="tab-nacrtovani" class="tab-panel" role="tabpanel" hidden>
@@ -66,11 +49,9 @@
             placeholder="Search"
             aria-label="Search ready to publish articles"
           >
-          <p class="sta-search-note"><em>We display ready-to-publish backend articles from each editorial.</em></p>
         </div>
-        <p class="tag-main">Editorials filters:</p>
-        <div id="readyToPublishFilters" class="published-filters" role="group" aria-label="Filter ready to publish by editorials"></div>
-        <div id="readyToPublishStatus" class="panel-status">Loading ready-to-publish articles...</div>
+        <div id="readyToPublishFilters" class="published-filters editorials-filters" role="group" aria-label="Filter ready to publish by editorials"></div>
+        <div id="readyToPublishStatus" class="panel-status">Loading...</div>
         <div id="readyToPublishList" class="article-list"></div>
       </section>
     </section>
