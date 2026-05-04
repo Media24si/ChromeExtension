@@ -577,14 +577,71 @@ function hasStaUsedFor(item) {
 	return normalized !== '' && normalized !== 'null';
 }
 
+function getStaUsedForIds(item) {
+	const usedFor = pickField(item, 'used_for');
+
+	if (usedFor == null) {
+		return [];
+	}
+
+	const rawValues = Array.isArray(usedFor) ? usedFor : [usedFor];
+
+	return Array.from(
+		new Set(
+			rawValues
+				.flatMap((value) => {
+					if (value == null) {
+						return [];
+					}
+
+					if (typeof value === 'object') {
+						const candidate = value.id ?? value.article_id ?? value.value;
+						return candidate == null ? [] : [candidate];
+					}
+
+					return String(value).split(',');
+				})
+				.map((value) => String(value || '').trim())
+				.filter((value) => value && value.toLowerCase() !== 'null')
+		)
+	);
+}
+
+function getStaUsedEditorialName(item) {
+	const usedIds = getStaUsedForIds(item);
+
+	if (!usedIds.length) {
+		return '';
+	}
+
+	const matchedPublished = publishedArticles.find((publishedItem) => {
+		const publishedId = String(pickField(publishedItem, 'id') || '').trim();
+		return publishedId && usedIds.includes(publishedId);
+	});
+
+	if (!matchedPublished) {
+		return '';
+	}
+
+	return getResourceName(pickField(matchedPublished, 'resource_id'));
+}
+
 function createSourceTag(sourceType, item) {
 	const tag = document.createElement('span');
 	tag.className = `source-tag source-tag--${sourceType}`;
 
-	if (sourceType === 'sta' && hasStaUsedFor(item)) {
-		tag.innerHTML = 'STA <span class="source-tag-used">(&#10004; used)</span>';
+	if (sourceType === 'sta') {
+		const usedEditorialName = getStaUsedEditorialName(item);
+
+		if (usedEditorialName) {
+			tag.innerHTML = `STA <span class="source-tag-used">(Uporabljeno: ${usedEditorialName})</span>`;
+		} else if (hasStaUsedFor(item)) {
+			tag.innerHTML = 'STA <span class="source-tag-used">(Uporabljeno)</span>';
+		} else {
+			tag.textContent = 'STA';
+		}
 	} else {
-		tag.textContent = sourceType === 'sta' ? 'STA' : 'Published';
+		tag.textContent = 'Published';
 	}
 
 	return tag;
