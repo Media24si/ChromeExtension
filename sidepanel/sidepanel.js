@@ -41,6 +41,11 @@ let readyToPublishArticles = [];
 let readyToPublishSearchTerm = '';
 let readyToPublishResourceFilters = [];
 let resourceNameMap = new Map();
+let sidebarStateCache = null;
+let publishedArticleToEditorialNameMap = new Map();
+const readyToPublishTimestampCache = new WeakMap();
+
+const SEARCH_STATE_SAVE_DEBOUNCE_MS = 250;
 
 const defaultSidebarState = {
 	activeTab: 'overview',
@@ -77,21 +82,39 @@ function switchTab(tabName) {
 
 async function loadSidebarState() {
 	const result = await chrome.storage.local.get(SIDEBAR_STATE_KEY);
-	return {
+	sidebarStateCache = {
 		...defaultSidebarState,
 		...(result[SIDEBAR_STATE_KEY] || {})
 	};
+
+	return sidebarStateCache;
 }
 
 async function saveSidebarState(partialState) {
-	const currentState = await loadSidebarState();
+	const currentState = sidebarStateCache || await loadSidebarState();
 	const nextState = {
 		...currentState,
 		...partialState
 	};
 
+	sidebarStateCache = nextState;
 	await chrome.storage.local.set({ [SIDEBAR_STATE_KEY]: nextState });
 	return nextState;
+}
+
+function createDebounced(fn, delayMs) {
+	let timerId = null;
+
+	return (...args) => {
+		if (timerId != null) {
+			clearTimeout(timerId);
+		}
+
+		timerId = setTimeout(() => {
+			timerId = null;
+			fn(...args);
+		}, delayMs);
+	};
 }
 
 function applySidebarState(state) {
@@ -614,16 +637,14 @@ function getStaUsedEditorialName(item) {
 		return '';
 	}
 
-	const matchedPublished = publishedArticles.find((publishedItem) => {
-		const publishedId = String(pickField(publishedItem, 'id') || '').trim();
-		return publishedId && usedIds.includes(publishedId);
-	});
-
-	if (!matchedPublished) {
-		return '';
+	for (const usedId of usedIds) {
+		const editorialName = publishedArticleToEditorialNameMap.get(usedId);
+		if (editorialName) {
+			return editorialName;
+		}
 	}
 
-	return getResourceName(pickField(matchedPublished, 'resource_id'));
+	return '';
 }
 
 function createSourceTag(sourceType, item) {
@@ -659,6 +680,7 @@ function renderOverviewArticles(items) {
 	}
 
 	overviewStatus.classList.add('hidden');
+	const fragment = document.createDocumentFragment();
 
 	items.forEach((entry) => {
 		const article = document.createElement('article');
@@ -704,8 +726,10 @@ function renderOverviewArticles(items) {
 			article.appendChild(metaGrid);
 		}
 
-		overviewList.appendChild(article);
+		fragment.appendChild(article);
 	});
+
+	overviewList.appendChild(fragment);
 }
 
 function getReadyToPublishTimestamp(item) {
@@ -713,13 +737,20 @@ function getReadyToPublishTimestamp(item) {
 }
 
 function getReadyToPublishTimestampMs(item) {
+	if (readyToPublishTimestampCache.has(item)) {
+		return readyToPublishTimestampCache.get(item);
+	}
+
 	const timestamp = String(getReadyToPublishTimestamp(item) || '').trim();
 	if (!timestamp) {
+		readyToPublishTimestampCache.set(item, null);
 		return null;
 	}
 
 	const parsedTimestamp = new Date(timestamp).getTime();
-	return Number.isNaN(parsedTimestamp) ? null : parsedTimestamp;
+	const normalizedTimestamp = Number.isNaN(parsedTimestamp) ? null : parsedTimestamp;
+	readyToPublishTimestampCache.set(item, normalizedTimestamp);
+	return normalizedTimestamp;
 }
 
 function getReadyToPublishResourceIds(item) {
@@ -800,6 +831,7 @@ function renderReadyToPublishArticles(items) {
 	}
 
 	readyToPublishStatus.classList.add('hidden');
+	const fragment = document.createDocumentFragment();
 
 	items.forEach((item) => {
 		const title = renderValue(pickField(item, 'title'));
@@ -832,8 +864,10 @@ function renderReadyToPublishArticles(items) {
 
 		article.prepend(titleElement);
 		article.append(metaGrid);
-		readyToPublishList.appendChild(article);
+		fragment.appendChild(article);
 	});
+
+	readyToPublishList.appendChild(fragment);
 }
 
 
@@ -851,9 +885,7 @@ function updateReadyToPublishList() {
 	);
 }
 
-function buildReadyToPublishUrl(resourceId) {
-	const publishedFrom = Date.now();
-	const publishedTill = publishedFrom + 2 * 24 * 60 * 60 * 1000;
+function buildReadyToPublishUrl(resourceId, publishedFrom, publishedTill) {
 
 	const params = new URLSearchParams({
 		resource_id: String(resourceId),
@@ -881,6 +913,21 @@ async function clearSidepanelAuthContext() {
 	await chrome.storage.local.remove(SIDEPANEL_AUTH_CONTEXT_KEY);
 }
 
+function rebuildPublishedArticleLookupMap() {
+	publishedArticleToEditorialNameMap = new Map(
+		publishedArticles
+			.map((publishedItem) => {
+				const publishedId = String(pickField(publishedItem, 'id') || '').trim();
+				if (!publishedId) {
+					return null;
+				}
+
+				return [publishedId, getResourceName(pickField(publishedItem, 'resource_id'))];
+			})
+			.filter(Boolean)
+	);
+}
+
 function clearReadyToPublishData() {
 	readyToPublishArticles = [];
 	updateReadyToPublishList();
@@ -893,6 +940,7 @@ function clearStaData() {
 
 function clearPublishedData() {
 	publishedArticles = [];
+	publishedArticleToEditorialNameMap = new Map();
 	updateOverviewList();
 }
 
@@ -964,8 +1012,8 @@ async function reacquireAuthTokenFromTab(preferredTabId) {
 	}
 }
 
-async function fetchReadyToPublishPayload(resourceId, token) {
-	const response = await fetch(buildReadyToPublishUrl(resourceId), {
+async function fetchReadyToPublishPayload(resourceId, token, publishedFrom, publishedTill) {
+	const response = await fetch(buildReadyToPublishUrl(resourceId, publishedFrom, publishedTill), {
 		method: 'GET',
 		cache: 'no-store',
 		headers: {
@@ -1086,6 +1134,8 @@ async function loadPublishedArticles() {
 				return (Number.isNaN(rightDate) ? 0 : rightDate) - (Number.isNaN(leftDate) ? 0 : leftDate);
 			});
 
+		rebuildPublishedArticleLookupMap();
+
 		updateOverviewList();
 	} catch (error) {
 		console.error('Failed to load published articles:', error);
@@ -1131,9 +1181,12 @@ async function loadReadyToPublishArticles() {
 		const runBatch = (authToken) =>
 			Promise.allSettled(
 				PUBLISHED_RESOURCE_IDS.map((resourceId) =>
-					fetchReadyToPublishPayload(resourceId, authToken)
+					fetchReadyToPublishPayload(resourceId, authToken, windowStart, windowEnd)
 				)
 			);
+
+		const windowStart = Date.now();
+		const windowEnd = windowStart + 2 * 24 * 60 * 60 * 1000;
 
 		let responses = await runBatch(token);
 		const hasAuthExpired = responses.some(
@@ -1174,9 +1227,6 @@ async function loadReadyToPublishArticles() {
 			throw new Error('No ready-to-publish requests succeeded.');
 		}
 
-		const nowMs = Date.now();
-		const windowStart = nowMs;
-		const windowEnd = nowMs + 2 * 24 * 60 * 60 * 1000;
 		const isInReadyWindow = (item) => {
 			const timestampMs = getReadyToPublishTimestampMs(item);
 			return timestampMs != null && timestampMs >= windowStart && timestampMs <= windowEnd;
@@ -1317,6 +1367,14 @@ function startAutoRefresh() {
 	}, STA_REFRESH_MS);
 }
 
+const debouncedSaveOverviewSearchTerm = createDebounced((value) => {
+	void saveSidebarState({ overviewSearchTerm: value });
+}, SEARCH_STATE_SAVE_DEBOUNCE_MS);
+
+const debouncedSaveReadyToPublishSearchTerm = createDebounced((value) => {
+	void saveSidebarState({ readyToPublishSearchTerm: value });
+}, SEARCH_STATE_SAVE_DEBOUNCE_MS);
+
 tabButtons.forEach((button) => {
 	button.addEventListener('click', () => {
 		const tabName = button.dataset.tab;
@@ -1336,6 +1394,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 		...(changes[SIDEBAR_STATE_KEY].newValue || {})
 	};
 
+	sidebarStateCache = nextState;
 	applySidebarState(nextState);
 	void loadActiveTabArticles();
 });
@@ -1348,14 +1407,14 @@ document.addEventListener('visibilitychange', () => {
 
 overviewSearchInput.addEventListener('input', (event) => {
 	overviewSearchTerm = event.target.value;
-	void saveSidebarState({ overviewSearchTerm });
+	debouncedSaveOverviewSearchTerm(overviewSearchTerm);
 	updateOverviewList();
 });
 
 if (readyToPublishSearchInput) {
 	readyToPublishSearchInput.addEventListener('input', (event) => {
 		readyToPublishSearchTerm = event.target.value;
-		void saveSidebarState({ readyToPublishSearchTerm });
+		debouncedSaveReadyToPublishSearchTerm(readyToPublishSearchTerm);
 		updateReadyToPublishList();
 	});
 }
