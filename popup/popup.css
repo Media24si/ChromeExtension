@@ -71,18 +71,44 @@ main {
   text-align: left;
 }
 
-.tool-btn:hover:not(:disabled) {
+.tool-btn-small {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-size: 12px;
+  width: 100%;
+  align-content: center;
+  justify-content: center;
+}
+
+.tool-btn-small-text {
+  padding: 6px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.tool-btn:hover:not(:disabled),
+.tool-btn-small:hover:not(:disabled) {
   background: #f8f9fa;
   border-color: #667eea;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
 }
 
-.tool-btn:active:not(:disabled) {
+.tool-btn:active:not(:disabled),
+.tool-btn-small:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.tool-btn:disabled {
+.tool-btn:disabled,
+.tool-btn-small:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

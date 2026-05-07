@@ -3,6 +3,7 @@ const editArticleBtn = document.getElementById('editArticleBtn');
 const purgeCacheBtn = document.getElementById('purgeCacheBtn');
 const articleOverviewBtn = document.getElementById('articleOverviewBtn');
 const toggleOverlayBtn = document.getElementById('toggleOverlayBtn');
+const downloadLatestVersionBtn = document.getElementById('downloadLatestVersionBtn');
 const showApi3ArticleBtn = document.getElementById('showApi3ArticleBtn');
 const statusMessage = document.getElementById('statusMessage');
 const pageInfo = document.getElementById('pageInfo');
@@ -521,6 +522,13 @@ toggleOverlayBtn.addEventListener('click', async () => {
     console.error('Error toggling overlay:', error);
     showStatus('Error toggling overlay', 'error');
   }
+});
+
+downloadLatestVersionBtn.addEventListener('click', async () => {
+  await chrome.tabs.create({
+    url: 'https://codeload.github.com/Media24si/ChromeExtension/zip/refs/heads/main'
+  });
+  window.close();
 });
 
 // Admin tools event listeners

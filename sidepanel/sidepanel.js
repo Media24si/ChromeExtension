@@ -192,8 +192,6 @@ async function setSharedEditorialFilters(nextFilters) {
 		readyToPublishResourceFilters: synchronizedFilters
 	});
 
-	renderPublishedFilters();
-	renderReadyToPublishFilters();
 	updateOverviewList();
 	updateReadyToPublishList();
 }
@@ -370,7 +368,7 @@ function getPublishedArticleUrl(item) {
 	return `https://svet24.si/clanki/test-${articleId}`;
 }
 
-function getPublishedFilterOptions() {
+function getEditorialFilterOptions() {
 	return [
 		{ id: 'all', name: 'All' },
 		...PUBLISHED_RESOURCE_IDS.map((resourceId) => ({
@@ -380,39 +378,53 @@ function getPublishedFilterOptions() {
 	];
 }
 
-function renderPublishedFilters() {
-	publishedFilters.innerHTML = '';
+function toggleResourceFilter(activeFilters, filterOptionId) {
+	const isAllButton = filterOptionId === 'all';
 
-	getPublishedFilterOptions().forEach((filterOption) => {
+	if (isAllButton) {
+		return [];
+	}
+
+	if (activeFilters.includes(filterOptionId)) {
+		return activeFilters.filter((resourceId) => resourceId !== filterOptionId);
+	}
+
+	return [...activeFilters, filterOptionId];
+}
+
+function renderEditorialFilters(container, activeFilters) {
+	if (!container) {
+		return;
+	}
+
+	container.innerHTML = '';
+
+	getEditorialFilterOptions().forEach((filterOption) => {
 		const button = document.createElement('button');
 		button.type = 'button';
 		button.className = 'published-filter-button';
 		button.dataset.resourceId = filterOption.id;
 		button.textContent = filterOption.name;
+
 		const isAllButton = filterOption.id === 'all';
 		const isActive = isAllButton
-			? publishedResourceFilters.length === 0
-			: publishedResourceFilters.includes(filterOption.id);
+			? activeFilters.length === 0
+			: activeFilters.includes(filterOption.id);
+
 		button.classList.toggle('active', isActive);
 		button.setAttribute('aria-pressed', String(isActive));
 
 		button.addEventListener('click', () => {
-			let nextFilters;
-			if (isAllButton) {
-				nextFilters = [];
-			} else if (publishedResourceFilters.includes(filterOption.id)) {
-				nextFilters = publishedResourceFilters.filter(
-					(resourceId) => resourceId !== filterOption.id
-				);
-			} else {
-				nextFilters = [...publishedResourceFilters, filterOption.id];
-			}
-
+			const nextFilters = toggleResourceFilter(activeFilters, filterOption.id);
 			void setSharedEditorialFilters(nextFilters);
 		});
 
-		publishedFilters.appendChild(button);
+		container.appendChild(button);
 	});
+}
+
+function renderPublishedFilters() {
+	renderEditorialFilters(publishedFilters, publishedResourceFilters);
 }
 
 function getOverviewSourceFilterOptions() {
@@ -465,55 +477,8 @@ function syncPublishedEditorialFiltersVisibility() {
 	publishedEditorialFiltersBlock.classList.toggle('hidden', !shouldShow);
 }
 
-function getReadyToPublishFilterOptions() {
-	return [
-		{ id: 'all', name: 'All' },
-		...PUBLISHED_RESOURCE_IDS.map((resourceId) => ({
-			id: String(resourceId),
-			name: getResourceName(resourceId)
-		}))
-	];
-}
-
 function renderReadyToPublishFilters() {
-	if (!readyToPublishFilters) {
-		return;
-	}
-
-	readyToPublishFilters.innerHTML = '';
-
-	getReadyToPublishFilterOptions().forEach((filterOption) => {
-		const button = document.createElement('button');
-		button.type = 'button';
-		button.className = 'published-filter-button';
-		button.dataset.resourceId = filterOption.id;
-		button.textContent = filterOption.name;
-
-		const isAllButton = filterOption.id === 'all';
-		const isActive = isAllButton
-			? readyToPublishResourceFilters.length === 0
-			: readyToPublishResourceFilters.includes(filterOption.id);
-
-		button.classList.toggle('active', isActive);
-		button.setAttribute('aria-pressed', String(isActive));
-
-		button.addEventListener('click', () => {
-			let nextFilters;
-			if (isAllButton) {
-				nextFilters = [];
-			} else if (readyToPublishResourceFilters.includes(filterOption.id)) {
-				nextFilters = readyToPublishResourceFilters.filter(
-					(resourceId) => resourceId !== filterOption.id
-				);
-			} else {
-				nextFilters = [...readyToPublishResourceFilters, filterOption.id];
-			}
-
-			void setSharedEditorialFilters(nextFilters);
-		});
-
-		readyToPublishFilters.appendChild(button);
-	});
+	renderEditorialFilters(readyToPublishFilters, readyToPublishResourceFilters);
 }
 
 function getOverviewTimestampMs(entry) {
@@ -733,7 +698,7 @@ function renderOverviewArticles(items) {
 }
 
 function getReadyToPublishTimestamp(item) {
-    return pickField(item, 'published_from') || '';
+	return pickField(item, 'published_from') || '';
 }
 
 function getReadyToPublishTimestampMs(item) {
