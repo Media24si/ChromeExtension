@@ -5,6 +5,7 @@ const READY_TO_PUBLISH_BASE_URL = 'https://api.kme.si/backend/v1/articles';
 const STA_REFRESH_MS = 30000;
 const SIDEBAR_STATE_KEY = 'articleOverviewSidebarState';
 const SIDEPANEL_AUTH_CONTEXT_KEY = 'sidepanelAuthContext';
+const OVERVIEW_SOURCE_FILTERS_STATE_VERSION = 2;
 const PUBLISHED_RESOURCE_IDS = [
 	106, 110, 33, 60, 47, 41,
 	109, 100, 67, 120, 107,
@@ -34,7 +35,7 @@ let staArticles = [];
 let publishedLoading = false;
 let publishedArticles = [];
 let overviewSearchTerm = '';
-let overviewSourceFilters = ['sta', 'published'];
+let overviewSourceFilters = ['sta', 'sta-used', 'published'];
 let publishedResourceFilters = [];
 let readyToPublishLoading = false;
 let readyToPublishArticles = [];
@@ -43,6 +44,7 @@ let readyToPublishResourceFilters = [];
 let resourceNameMap = new Map();
 let sidebarStateCache = null;
 let publishedArticleToEditorialNameMap = new Map();
+let publishedArticleIdsUsedBySta = new Set();
 const readyToPublishTimestampCache = new WeakMap();
 
 const SEARCH_STATE_SAVE_DEBOUNCE_MS = 250;
@@ -50,7 +52,8 @@ const SEARCH_STATE_SAVE_DEBOUNCE_MS = 250;
 const defaultSidebarState = {
 	activeTab: 'overview',
 	overviewSearchTerm: '',
-	overviewSourceFilters: ['sta', 'published'],
+	overviewSourceFilters: ['sta', 'sta-used', 'published'],
+	overviewSourceFiltersVersion: OVERVIEW_SOURCE_FILTERS_STATE_VERSION,
 	publishedResourceFilters: [],
 	readyToPublishResourceFilters: [],
 	readyToPublishSearchTerm: ''
@@ -121,6 +124,12 @@ function applySidebarState(state) {
 	activeTab = (state.activeTab === 'nacrtovani') ? 'nacrtovani' : 'overview';
 	overviewSearchTerm = state.overviewSearchTerm || state.publishedSearchTerm || state.staSearchTerm || '';
 	overviewSourceFilters = normalizeSourceFilters(state.overviewSourceFilters);
+	const sourceFilterStateVersion = Number(state.overviewSourceFiltersVersion || 1);
+	if (sourceFilterStateVersion < OVERVIEW_SOURCE_FILTERS_STATE_VERSION) {
+		if (overviewSourceFilters.includes('sta') && !overviewSourceFilters.includes('sta-used')) {
+			overviewSourceFilters = [...overviewSourceFilters, 'sta-used'];
+		}
+	}
 	publishedResourceFilters = normalizeResourceFilters(
 		state.publishedResourceFilters ?? state.publishedResourceFilter
 	);
@@ -145,15 +154,15 @@ function applySidebarState(state) {
 
 function normalizeSourceFilters(value) {
 	if (!Array.isArray(value) || !value.length) {
-		return ['sta', 'published'];
+		return ['sta', 'sta-used', 'published'];
 	}
 
-	const allowed = new Set(['sta', 'published']);
+	const allowed = new Set(['sta', 'sta-used', 'published']);
 	const normalized = value
 		.map((filterValue) => String(filterValue || '').trim().toLowerCase())
 		.filter((filterValue) => allowed.has(filterValue));
 
-	return normalized.length ? Array.from(new Set(normalized)) : ['sta', 'published'];
+	return normalized.length ? Array.from(new Set(normalized)) : ['sta', 'sta-used', 'published'];
 }
 
 function normalizeResourceFilters(value) {
@@ -430,6 +439,7 @@ function renderPublishedFilters() {
 function getOverviewSourceFilterOptions() {
 	return [
 		{ id: 'sta', name: 'STA' },
+		{ id: 'sta-used', name: 'STA (USED)' },
 		{ id: 'published', name: 'Published' }
 	];
 }
@@ -453,13 +463,22 @@ function renderOverviewSourceFilters() {
 		button.setAttribute('aria-pressed', String(isActive));
 
 		button.addEventListener('click', () => {
+			const isCurrentlyActive = overviewSourceFilters.includes(filterOption.id);
+
+			if (isCurrentlyActive && overviewSourceFilters.length === 1) {
+				return;
+			}
+
 			if (overviewSourceFilters.includes(filterOption.id)) {
 				overviewSourceFilters = overviewSourceFilters.filter((value) => value !== filterOption.id);
 			} else {
 				overviewSourceFilters = [...overviewSourceFilters, filterOption.id];
 			}
 
-			void saveSidebarState({ overviewSourceFilters });
+			void saveSidebarState({
+				overviewSourceFilters,
+				overviewSourceFiltersVersion: OVERVIEW_SOURCE_FILTERS_STATE_VERSION
+			});
 			renderOverviewSourceFilters();
 			updateOverviewList();
 		});
@@ -532,7 +551,15 @@ function filterOverviewItems(items, searchTerm) {
 	const normalizedSearch = searchTerm.trim().toLowerCase();
 
 	return items.filter((entry) => {
-		if (!overviewSourceFilters.includes(entry.source)) {
+		if (entry.source === 'sta') {
+			const isUsed = hasStaUsedFor(entry.item);
+			const matchesStaUnused = overviewSourceFilters.includes('sta') && !isUsed;
+			const matchesStaUsed = overviewSourceFilters.includes('sta-used') && isUsed;
+
+			if (!matchesStaUnused && !matchesStaUsed) {
+				return false;
+			}
+		} else if (!overviewSourceFilters.includes(entry.source)) {
 			return false;
 		}
 
@@ -612,6 +639,20 @@ function getStaUsedEditorialName(item) {
 	return '';
 }
 
+function rebuildPublishedIdsUsedByStaSet() {
+	publishedArticleIdsUsedBySta = new Set(
+		staArticles
+			.flatMap((staItem) => getStaUsedForIds(staItem))
+			.map((value) => String(value || '').trim())
+			.filter(Boolean)
+	);
+}
+
+function isPublishedArticleUsedBySta(item) {
+	const publishedId = String(pickField(item, 'id') || '').trim();
+	return publishedId !== '' && publishedArticleIdsUsedBySta.has(publishedId);
+}
+
 function createSourceTag(sourceType, item) {
 	const tag = document.createElement('span');
 	tag.className = `source-tag source-tag--${sourceType}`;
@@ -627,7 +668,11 @@ function createSourceTag(sourceType, item) {
 			tag.textContent = 'STA';
 		}
 	} else {
-		tag.textContent = 'Published';
+		if (isPublishedArticleUsedBySta(item)) {
+			tag.innerHTML = 'Published <span class="source-tag-used">(STA)</span>';
+		} else {
+			tag.textContent = 'Published';
+		}
 	}
 
 	return tag;
@@ -900,6 +945,7 @@ function clearReadyToPublishData() {
 
 function clearStaData() {
 	staArticles = [];
+	publishedArticleIdsUsedBySta = new Set();
 	updateOverviewList();
 }
 
@@ -1045,6 +1091,7 @@ async function loadStaArticles() {
 
 		const payload = await response.json();
 		staArticles = normalizeArticles(payload);
+		rebuildPublishedIdsUsedByStaSet();
 		updateOverviewList();
 	} catch (error) {
 		console.error('Failed to load STA articles:', error);

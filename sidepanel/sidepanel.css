@@ -287,18 +287,21 @@ body {
   color: #1f7a3d;
 }
 
-#overviewSourceFilters .source-filter-button[data-source-type='sta'] {
+#overviewSourceFilters .source-filter-button[data-source-type='sta'],
+#overviewSourceFilters .source-filter-button[data-source-type='sta-used'] {
   background: #e8f4ff;
   color: #0b63b0;
   border-color: rgba(11, 99, 176, 0.28);
 }
 
-#overviewSourceFilters .source-filter-button[data-source-type='sta']:hover {
+#overviewSourceFilters .source-filter-button[data-source-type='sta']:hover,
+#overviewSourceFilters .source-filter-button[data-source-type='sta-used']:hover {
   background: #d8ecff;
   border-color: rgba(11, 99, 176, 0.42);
 }
 
-#overviewSourceFilters .source-filter-button[data-source-type='sta'].active {
+#overviewSourceFilters .source-filter-button[data-source-type='sta'].active,
+#overviewSourceFilters .source-filter-button[data-source-type='sta-used'].active {
   background: #0b63b0;
   color: #ffffff;
   border-color: #0b63b0;
