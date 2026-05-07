@@ -9,6 +9,9 @@ const statusMessage = document.getElementById('statusMessage');
 const pageInfo = document.getElementById('pageInfo');
 const toolSection = document.querySelector('.tool-section');
 const adminToolsSection = document.getElementById('admin-section');
+const detailedInstructionsToggle = document.getElementById('detailedInstructionsToggle');
+const detailedInstructionsPanel = document.getElementById('detailedInstructionsPanel');
+const shortInstructionsText = document.getElementById('shortInstructionsText');
 
 // State
 let currentTab = null;
@@ -371,7 +374,7 @@ function showNotAuthenticated(reason = 'Not authenticated') {
     </small>
   `;
 
-  showStatus('Not authenticated - please log in to the backend.', 'error', false);
+  showStatus('Not authenticated', 'error', false);
 }
 
 /**
@@ -530,6 +533,16 @@ downloadLatestVersionBtn.addEventListener('click', async () => {
   });
   window.close();
 });
+
+if (detailedInstructionsToggle && detailedInstructionsPanel && shortInstructionsText) {
+  detailedInstructionsToggle.addEventListener('click', () => {
+    const isHidden = detailedInstructionsPanel.classList.toggle('hidden');
+    shortInstructionsText.classList.toggle('hidden', !isHidden);
+    detailedInstructionsToggle.textContent = isHidden
+      ? 'More detailed instructions'
+      : 'Hide detailed instructions';
+  });
+}
 
 // Admin tools event listeners
 showApi3ArticleBtn.addEventListener('click', async () => {

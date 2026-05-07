@@ -33,6 +33,29 @@
           <span class="icon">👁️</span>
           <span class="label">Toggle Overlay</span>
         </button>
+        <div>
+          <div class="info-section"></div>
+          <button id="downloadLatestVersionBtn" class="tool-btn-small">
+            <span class="label">Download the latest version of the extension</span>
+          </button>
+          <p id="shortInstructionsText" class="tool-btn-small-text">
+            After downloading, replace files in your local extension folder, then reload the extension in Chrome.
+          </p>
+          <button id="detailedInstructionsToggle" class="instructions-toggle-btn" type="button">
+            More detailed instructions
+          </button>
+          <div id="detailedInstructionsPanel" class="detailed-instructions hidden">
+            <ol>
+              <li>Download Latest Version in popup and wait for ZIP download.</li>
+              <li>Find ZIP in Downloads (usually ChromeExtension-main.zip).</li>
+              <li>Extract all to folder (ChromeExtension-main).</li>
+              <li>Use the same local folder as Load unpacked in chrome://extensions. If unsure: open chrome://extensions, then extension Details, then Extension root directory.</li>
+              <li>Copy all extracted files into that target folder and replace destination files.</li>
+              <li>Open chrome://extensions and click Reload for this extension.</li>
+              <li>Verify popup reflects latest changes.</li>
+            </ol>
+          </div>
+        </div>
       </div>
 
       <div id="admin-section" class="admin-tools-section" style="display: none;">
@@ -50,10 +73,6 @@
           <small>Loading page info...</small>
         </div>
       </div>
-      <button id="downloadLatestVersionBtn" class="tool-btn-small">
-        <span class="label">Download the latest version of the extension</span>
-      </button>
-      <p class="tool-btn-small-text">Unzip it into the same local folder where it is currently located, replacing the existing contents. Then refresh it in Chrome.</p>
     </main>
   </div>
 

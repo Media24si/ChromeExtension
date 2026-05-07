@@ -1294,7 +1294,7 @@ async function loadActiveTabArticles() {
 		clearStaData();
 		clearPublishedData();
 		clearReadyToPublishData();
-		showUnauthenticatedView('Not authenticated - please log in to the backend.');
+		showUnauthenticatedView('Not authenticated. Please log in to use editor tools');
 		return;
 	}
 

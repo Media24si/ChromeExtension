@@ -94,6 +94,52 @@ main {
   font-size: 10px;
 }
 
+.tool-btn-small-text.hidden {
+  display: none;
+}
+
+.instructions-toggle-btn {
+  background: none;
+  border: none;
+  padding: 7px 0 0;
+  margin: 0 auto;
+  color: #0b57d0;
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+  display: block;
+}
+
+.instructions-toggle-btn:hover {
+  color: #0842a0;
+}
+
+.detailed-instructions {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #555;
+  text-align: left;
+  padding:8px;
+  border-radius: 6px;
+  background-color: rgba(255,255,255,0.8);
+  max-height: 150px;
+  overflow: auto;
+}
+
+.detailed-instructions ol {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.detailed-instructions li {
+  margin-bottom: 4px;
+}
+
+.detailed-instructions.hidden {
+  display: none;
+}
+
 .tool-btn:hover:not(:disabled),
 .tool-btn-small:hover:not(:disabled) {
   background: #f8f9fa;
